@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 
 /*
@@ -33,11 +35,69 @@ public class VersionManager {
      */
 
     public String getLatestRealeaseId(){
-        if(manifest == null){
-            throw new IllegalStateException("Manifest is null. First call fetchManifest()");
-        }
+
+        ensureManifestLoaded();
         return manifest.getLatest().getRelease();
     }
+
+    /**
+     * Devuelve la lista completa de objetos Version tras parsear el manifiesto.
+     * @return lista de Version
+     */
+
+    public List<Version> getVersions() {
+        ensureManifestLoaded();
+        return manifest.getVersions();
+    }
+
+    /**
+     * Devuelve solo los IDs (String) de todas las versiones.
+     * @return lista de IDs de versión
+     */
+
+    public List<String> getVersionsIds(){
+        return getVersions()
+                .stream()
+                .map(Version::getId)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Descarga y parsea los detalles de la versión especificada.
+     * @param versionId ID de la versión (p.ej. "1.20.1")
+     * @return VersionDetails con librerías y cliente
+     * @throws IOException si falla la descarga o el parseo
+     */
+    public VersionDetails fetchVersionDetails(String versionId) throws IOException {
+        // Aseguramos que el manifiesto esté cargado
+        if (manifest == null) {
+            fetchManifest();
+        }
+
+        // Buscamos la Version con el ID dado
+        Optional<Version> match = manifest.getVersions()
+                .stream()
+                .filter(v -> v.getId().equals(versionId))
+                .findFirst();
+
+        Version version = match.orElseThrow(
+                () -> new IllegalArgumentException("Versión no encontrada: " + versionId)
+        );
+
+        // Cargamos y devolvemos los detalles desde la URL del JSON de versión
+        return VersionDetails.loadFromUrl(version.getUrl());
+    }
+
+
+    /**
+     * Verifica que el manifiesto ya se haya cargado antes de acceder a él.
+     */
+    private void ensureManifestLoaded() {
+        if (manifest == null) {
+            throw new IllegalStateException("Manifest no cargado. Llama primero a fetchManifest().");
+        }
+    }
+
 
     // Clases internas para mapear el JSON del Manifest
 
@@ -47,6 +107,7 @@ public class VersionManager {
 
         public Latest getLatest(){ return latest; }
         public void setLatest(Latest latest){this.latest = latest;}
+
         public List<Version> getVersions(){ return versions; }
         public void setVersions(List<Version> versions){this.versions = versions;}
 
@@ -59,6 +120,7 @@ public class VersionManager {
 
         public String getRelease(){ return release; }
         public void setRelease(String release){this.release = release;}
+
         public String getSnapshot(){ return snapshot; }
         public void setSnapshot(String snapshot){this.snapshot = snapshot;}
     }
