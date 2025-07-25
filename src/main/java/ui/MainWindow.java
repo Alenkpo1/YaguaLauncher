@@ -4,6 +4,8 @@ import core.AuthManager;
 import core.AssetDownloader;
 import core.AssetsManager;
 import core.LaunchExecutor;
+import core.ProfileManager;
+import core.ProfileManager.Profile;
 import core.VersionDetails;
 import core.VersionManager;
 import javafx.application.Application;
@@ -24,36 +26,43 @@ import java.util.*;
 /**
  * Ventana principal del launcher:
  *  - Login offline
- *  - Selección de versión (remote + instaladas)
- *  - Descarga de librerías, cliente y assets (solo si no está instalada)
+ *  - Gestión de perfiles persistentes
+ *  - Selección y descarga de versión (librerías + cliente + assets)
  *  - Configuración de RAM
  *  - Lanzamiento del juego
  */
 public class MainWindow extends Application {
-    // UI de autenticación
+    // — UI de autenticación —
     private TextField usernameField;
     private Button    loginButton;
     private Label     loginStatusLabel;
 
-    // UI de versiones
+    // — UI de perfiles —
+    private ComboBox<String> profileCombo;
+    private Button           newProfileBtn;
+    private Button           saveProfileBtn;
+    private Button           deleteProfileBtn;
+
+    // — UI de versiones —
     private ComboBox<String> versionCombo;
     private Button           downloadButton;
 
-    // UI de progreso y lanzamiento
+    // — UI de progreso y lanzamiento —
     private ProgressBar progressBar;
     private Label       statusLabel;
     private TextField   ramField;
     private Button      launchButton;
 
-    // Managers y estado
-    private AuthManager         authManager;
-    private VersionManager      versionManager;
-    private AssetDownloader     assetDownloader;
-    private AssetsManager       assetsManager;
-    private LaunchExecutor      launchExecutor;
+    // — Managers y estado —
+    private AuthManager        authManager;
+    private ProfileManager     profileManager;
+    private VersionManager     versionManager;
+    private AssetDownloader    assetDownloader;
+    private AssetsManager      assetsManager;
+    private LaunchExecutor     launchExecutor;
     private AuthManager.Session session;
 
-    // Directorio base ~/.minecraft (o %APPDATA%/.minecraft en Windows)
+    // Directorio base ~/.minecraft o %APPDATA%/.minecraft en Windows
     private final Path mcBaseDir;
 
     // Conjunto de versiones ya instaladas localmente
@@ -71,8 +80,9 @@ public class MainWindow extends Application {
 
     @Override
     public void start(Stage stage) {
-        // 1) Crear managers
+        // 1) Inicializar managers
         authManager     = new AuthManager();
+        profileManager  = new ProfileManager(mcBaseDir);
         versionManager  = new VersionManager();
         assetDownloader = new AssetDownloader();
         assetsManager   = new AssetsManager(mcBaseDir.resolve("assets"));
@@ -80,52 +90,70 @@ public class MainWindow extends Application {
         if (javaHome == null) javaHome = System.getProperty("java.home");
         launchExecutor  = new LaunchExecutor(javaHome);
 
-        // 2) Crear componentes UI
+        // 2) Construir UI
         usernameField    = new TextField(); usernameField.setPromptText("Usuario offline");
         loginButton      = new Button("Login Offline");
         loginStatusLabel = new Label("Por favor, inicia sesión offline.");
 
-        versionCombo   = new ComboBox<>(); versionCombo.setPromptText("Selecciona una versión...");
+        profileCombo     = new ComboBox<>();
+        newProfileBtn    = new Button("Nuevo perfil");
+        saveProfileBtn   = new Button("Guardar perfil");
+        deleteProfileBtn = new Button("Borrar perfil");
+
+        versionCombo     = new ComboBox<>();
+        versionCombo.setPromptText("Selecciona una versión...");
         versionCombo.setDisable(true);
-        downloadButton = new Button("Descargar versión");
+        downloadButton   = new Button("Descargar versión");
         downloadButton.setDisable(true);
 
-        progressBar = new ProgressBar(0);
+        progressBar      = new ProgressBar(0);
         progressBar.setPrefWidth(300);
         progressBar.setVisible(false);
-        statusLabel = new Label("");
+        statusLabel      = new Label("");
 
-        ramField     = new TextField("1024"); ramField.setPromptText("RAM (MB)");
+        ramField         = new TextField("1024"); ramField.setPromptText("RAM (MB)");
         ramField.setDisable(true);
-        launchButton = new Button("Lanzar Minecraft");
+        launchButton     = new Button("Lanzar Minecraft");
         launchButton.setDisable(true);
 
-        // 3) Layout
+        // 3) Layout principal
         VBox root = new VBox(10,
                 usernameField, loginButton, loginStatusLabel,
+                new Label("Perfiles:"), profileCombo,
+                newProfileBtn, saveProfileBtn, deleteProfileBtn,
                 versionCombo, downloadButton,
                 progressBar, statusLabel,
                 ramField, launchButton
         );
         root.setPadding(new Insets(20));
 
-        stage.setScene(new Scene(root, 450, 380));
+        stage.setScene(new Scene(root, 480, 560));
         stage.setTitle("MC Yagua Launcher");
         stage.show();
 
-        // 4) Eventos
-        loginButton    .setOnAction(e -> performLogin());
-        downloadButton .setOnAction(e -> downloadVersionAssets());
-        launchButton   .setOnAction(e -> launchGame());
-        versionCombo   .getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
-            onVersionSelected(newV);
-        });
+        // 4) Eventos UI
+        loginButton   .setOnAction(e -> performLogin());
+        newProfileBtn .setOnAction(e -> createNewProfile());
+        saveProfileBtn.setOnAction(e -> saveCurrentProfile());
+        deleteProfileBtn.setOnAction(e -> deleteSelectedProfile());
+        profileCombo  .setOnAction(e -> applySelectedProfile());
 
-        // 5) Intentar cargar sesión previa y escanear versiones instaladas
+        // Versión
+        versionCombo.getSelectionModel()
+                .selectedItemProperty()
+                .addListener((obs, ov, nv) -> onVersionSelected(nv));
+
+        downloadButton.setOnAction(e -> downloadVersionAssets());
+        launchButton  .setOnAction(e -> launchGame());
+
+        // 5) Cargar estado inicial
         loadExistingSession();
         scanInstalledVersions();
+        populateProfiles();
+        loadVersionsAsync();
     }
 
+    // Autologin offline si existe
     private void loadExistingSession() {
         try {
             AuthManager.Session s = authManager.loadSession();
@@ -158,30 +186,79 @@ public class MainWindow extends Application {
         loginStatusLabel.setText("Sesión: " + s.getUsername() + " (" + s.getUuid() + ")");
         usernameField.setDisable(true);
         loginButton  .setDisable(true);
-
-        versionCombo.setDisable(false);
-        loadVersionsAsync();
+        // ahora podemos usar perfiles
+        profileCombo.setDisable(false);
     }
 
-    /**
-     * Escanea ~/.minecraft/versions para saber qué versiones ya están instaladas.
-     */
+    // Detecta qué versiones ya existen en disco
     private void scanInstalledVersions() {
         installedVersions.clear();
         Path versionsDir = mcBaseDir.resolve("versions");
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(versionsDir)) {
             for (Path vdir : ds) {
                 if (Files.isDirectory(vdir)) {
-                    Path jar = vdir.resolve(vdir.getFileName().toString() + ".jar");
-                    if (Files.exists(jar)) {
-                        installedVersions.add(vdir.getFileName().toString());
-                    }
+                    String name = vdir.getFileName().toString();
+                    Path jar = vdir.resolve(name + ".jar");
+                    if (Files.exists(jar)) installedVersions.add(name);
                 }
             }
-        } catch (IOException ignored) { }
+        } catch (IOException ignored) {}
     }
 
+    // Pone en el ComboBox los perfiles cargados
+    private void populateProfiles() {
+        profileCombo.getItems().setAll(profileManager.getProfiles().keySet());
+    }
+
+    private void createNewProfile() {
+        TextInputDialog dlg = new TextInputDialog();
+        dlg.setTitle("Nuevo perfil");
+        dlg.setHeaderText("Nombre del nuevo perfil:");
+        dlg.showAndWait().ifPresent(name -> {
+            if (!name.isBlank() && !profileManager.getProfiles().containsKey(name)) {
+                Profile p = new Profile(name,
+                        versionCombo.getValue(),
+                        Integer.parseInt(ramField.getText().trim()));
+                profileManager.addOrUpdate(p);
+                profileCombo.getItems().add(name);
+                profileCombo.getSelectionModel().select(name);
+            }
+        });
+    }
+
+    private void saveCurrentProfile() {
+        String name = profileCombo.getValue();
+        if (name != null) {
+            Profile p = new Profile(name,
+                    versionCombo.getValue(),
+                    Integer.parseInt(ramField.getText().trim()));
+            profileManager.addOrUpdate(p);
+        }
+    }
+
+    private void deleteSelectedProfile() {
+        String name = profileCombo.getValue();
+        if (name != null) {
+            profileManager.remove(name);
+            profileCombo.getItems().remove(name);
+            profileCombo.getSelectionModel().clearSelection();
+        }
+    }
+
+    private void applySelectedProfile() {
+        String name = profileCombo.getValue();
+        if (name != null) {
+            Profile p = profileManager.getProfiles().get(name);
+            versionCombo.getSelectionModel().select(p.getVersionId());
+            ramField.setText(String.valueOf(p.getRamMb()));
+            // forzar el enable/disable de botones
+            onVersionSelected(p.getVersionId());
+        }
+    }
+
+    // Carga la lista de versiones remotas y local
     private void loadVersionsAsync() {
+        versionCombo.setDisable(true);
         downloadButton.setDisable(true);
         Task<List<String>> t = new Task<>() {
             @Override protected List<String> call() throws Exception {
@@ -192,6 +269,7 @@ public class MainWindow extends Application {
         t.setOnSucceeded(evt -> {
             List<String> ids = t.getValue();
             versionCombo.getItems().setAll(ids);
+            versionCombo.setDisable(false);
             statusLabel.setText("Versiones remotas cargadas: " + ids.size());
         });
         t.setOnFailed(evt -> statusLabel.setText("Error cargando versiones"));
@@ -199,9 +277,9 @@ public class MainWindow extends Application {
     }
 
     /**
-     * Gestiona UI al seleccionar una versión:
-     * - Si está instalada: habilita lanzamiento directo.
-     * - Si no: habilita botón de descarga.
+     * Al seleccionar una versión:
+     *  - Si ya está instalada, habilita lanzar.
+     *  - Si no, habilita descarga.
      */
     private void onVersionSelected(String ver) {
         if (ver == null) return;
@@ -231,53 +309,44 @@ public class MainWindow extends Application {
                 updateMessage("Descargando detalles de versión...");
                 VersionDetails det = versionManager.fetchVersionDetails(ver);
 
-                // 1) Descargar librerías + cliente
+                // 1) Librerías + cliente
                 int libs      = det.getLibraries().size();
                 int coreTotal = libs + 1;
                 int coreDone  = 0;
-
                 for (var lib : det.getLibraries()) {
                     String url  = lib.getDownloads().getArtifact().getUrl();
                     String sha1 = lib.getDownloads().getArtifact().getSha1();
-                    Path target = mcBaseDir.resolve("libraries")
-                            .resolve(Paths.get(pathFromUrl(url)));
+                    Path target = mcBaseDir.resolve("libraries").resolve(Paths.get(pathFromUrl(url)));
                     updateMessage("Descargando librería: " + target.getFileName());
                     assetDownloader.downloadAndVerify(url, target, sha1);
                     updateProgress(++coreDone, coreTotal);
                 }
-
                 var cd         = det.getClientDownload();
-                Path clientPath = mcBaseDir.resolve("versions")
-                        .resolve(ver)
-                        .resolve(ver + ".jar");
+                Path clientPath = mcBaseDir.resolve("versions").resolve(ver).resolve(ver + ".jar");
                 updateMessage("Descargando cliente: " + ver + ".jar");
                 assetDownloader.downloadAndVerify(cd.getUrl(), clientPath, cd.getSha1());
                 updateProgress(++coreDone, coreTotal);
 
-                // 2) Descargar assets
+                // 2) Assets
                 updateMessage("Obteniendo asset index...");
-                var aiInfo = det.getAssetIndex();
-                AssetsManager.AssetIndex ai =
-                        assetsManager.fetchAssetIndex(aiInfo.getUrl(), aiInfo.getId());
+                var aiInfo     = det.getAssetIndex();
+                var ai         = assetsManager.fetchAssetIndex(aiInfo.getUrl(), aiInfo.getId());
                 Map<String, AssetsManager.AssetObject> objects = ai.objects;
-
                 int assetsTotal  = objects.size();
                 int overallTotal = coreTotal + assetsTotal;
                 int overallDone  = coreDone;
                 int count        = 0;
-
-                for (var entry : objects.entrySet()) {
-                    String key  = entry.getKey();
-                    String hash = entry.getValue().hash;
-                    updateMessage("Descargando asset " + (++count)
-                            + " de " + assetsTotal + ": " + key);
+                for (var e : objects.entrySet()) {
+                    String key  = e.getKey();
+                    String hash = e.getValue().hash;
+                    updateMessage("Descargando asset " + (++count) + "/" + assetsTotal + ": " + key);
                     assetsManager.downloadSingleAsset(key, hash);
                     updateProgress(++overallDone, overallTotal);
                 }
 
-                updateMessage("Descarga completa de librerías, cliente y assets.");
-                // Marcar como instalada
+                // marcar instalada
                 installedVersions.add(ver);
+                updateMessage("Descarga completa.");
                 return null;
             }
         };

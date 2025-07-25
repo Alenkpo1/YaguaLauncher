@@ -3,10 +3,8 @@ plugins {
     id("org.openjfx.javafxplugin") version "0.0.13"
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
+
+
 
 application {
 
