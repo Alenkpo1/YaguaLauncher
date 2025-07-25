@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class VersionDetails {
@@ -90,7 +91,41 @@ public class VersionDetails {
         return mapper.readValue(new URL(detailsUrl), VersionDetails.class);
     }
 
+    @JsonProperty("assetIndex")
+    private AssetIndexInfo assetIndex;
+    public AssetIndexInfo getAssetIndex() { return assetIndex; }
+    public void setAssetIndex(AssetIndexInfo assetIndex) { this.assetIndex = assetIndex; }
 
+    /** Clase que mapea los campos de assetIndex */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AssetIndexInfo {
+        private String id;
+        private String url;
+        private String sha1;
+
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getUrl() { return url; }
+        public void setUrl(String url) { this.url = url; }
+        public String getSha1() { return sha1; }
+        public void setSha1(String sha1) { this.sha1 = sha1; }
+    }
+
+    /** Mapea los objetos dentro del índice de assets */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AssetObject {
+        private String hash;
+        public String getHash() { return hash; }
+        public void setHash(String hash) { this.hash = hash; }
+    }
+
+    /** Clase para representar todo el asset index cuando lo parseemos */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AssetIndex {
+        private Map<String, AssetObject> objects;
+        public Map<String, AssetObject> getObjects() { return objects; }
+        public void setObjects(Map<String, AssetObject> objects) { this.objects = objects; }
+    }
     /**
      * Clase auxiliar para exponer  los datos de descarga.
      */

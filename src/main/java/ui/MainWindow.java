@@ -1,180 +1,331 @@
 package ui;
 
+import core.AuthManager;
 import core.AssetDownloader;
+import core.AssetsManager;
+import core.LaunchExecutor;
 import core.VersionDetails;
 import core.VersionManager;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.*;
+import java.util.*;
 
 /**
- * Ventana principal del launcher con selección de versión y descarga de librerías/assets.
+ * Ventana principal del launcher:
+ *  - Login offline
+ *  - Selección de versión (remote + instaladas)
+ *  - Descarga de librerías, cliente y assets (solo si no está instalada)
+ *  - Configuración de RAM
+ *  - Lanzamiento del juego
  */
 public class MainWindow extends Application {
-    private ComboBox<String> versionCombo;    // Desplegable de IDs de versión
-    private Button downloadButton;            // Botón para iniciar descarga
-    private ProgressBar progressBar;          // Barra de progreso de descarga
-    private Label statusLabel;                // Etiqueta de estado/mensajes
+    // UI de autenticación
+    private TextField usernameField;
+    private Button    loginButton;
+    private Label     loginStatusLabel;
 
-    private VersionManager versionManager;
-    private AssetDownloader assetDownloader;  // Campo para usar el downloader en toda la clase
+    // UI de versiones
+    private ComboBox<String> versionCombo;
+    private Button           downloadButton;
 
-    // Directorio base de Minecraft (en la carpeta del usuario)
-    private final Path mcBaseDir = Paths.get(System.getProperty("user.home"), ".minecraft");
+    // UI de progreso y lanzamiento
+    private ProgressBar progressBar;
+    private Label       statusLabel;
+    private TextField   ramField;
+    private Button      launchButton;
+
+    // Managers y estado
+    private AuthManager         authManager;
+    private VersionManager      versionManager;
+    private AssetDownloader     assetDownloader;
+    private AssetsManager       assetsManager;
+    private LaunchExecutor      launchExecutor;
+    private AuthManager.Session session;
+
+    // Directorio base ~/.minecraft (o %APPDATA%/.minecraft en Windows)
+    private final Path mcBaseDir;
+
+    // Conjunto de versiones ya instaladas localmente
+    private final Set<String> installedVersions = new HashSet<>();
+
+    public MainWindow() {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            String appdata = System.getenv("APPDATA");
+            mcBaseDir = Paths.get(appdata != null ? appdata : System.getProperty("user.home"), ".minecraft");
+        } else {
+            mcBaseDir = Paths.get(System.getProperty("user.home"), ".minecraft");
+        }
+    }
 
     @Override
     public void start(Stage stage) {
-        // 1) Crear y configurar el ComboBox para versiones
-        versionCombo = new ComboBox<>();
-        versionCombo.setPromptText("Selecciona una versión...");
+        // 1) Crear managers
+        authManager     = new AuthManager();
+        versionManager  = new VersionManager();
+        assetDownloader = new AssetDownloader();
+        assetsManager   = new AssetsManager(mcBaseDir.resolve("assets"));
+        String javaHome = System.getenv("JAVA_HOME");
+        if (javaHome == null) javaHome = System.getProperty("java.home");
+        launchExecutor  = new LaunchExecutor(javaHome);
 
-        // 2) Crear botón de descarga y deshabilitarlo hasta seleccionar una versión
-        downloadButton = new Button("Descargar");
-        downloadButton.disableProperty().bind(
-                versionCombo.getSelectionModel().selectedItemProperty().isNull()
-        );
+        // 2) Crear componentes UI
+        usernameField    = new TextField(); usernameField.setPromptText("Usuario offline");
+        loginButton      = new Button("Login Offline");
+        loginStatusLabel = new Label("Por favor, inicia sesión offline.");
 
-        // 3) Crear barra de progreso (invisible al inicio)
+        versionCombo   = new ComboBox<>(); versionCombo.setPromptText("Selecciona una versión...");
+        versionCombo.setDisable(true);
+        downloadButton = new Button("Descargar versión");
+        downloadButton.setDisable(true);
+
         progressBar = new ProgressBar(0);
         progressBar.setPrefWidth(300);
         progressBar.setVisible(false);
+        statusLabel = new Label("");
 
-        // 4) Crear etiqueta de estado
-        statusLabel = new Label("Cargando versiones...");
+        ramField     = new TextField("1024"); ramField.setPromptText("RAM (MB)");
+        ramField.setDisable(true);
+        launchButton = new Button("Lanzar Minecraft");
+        launchButton.setDisable(true);
 
-        // 5) Layout vertical con padding
-        VBox root = new VBox(10, versionCombo, downloadButton, progressBar, statusLabel);
+        // 3) Layout
+        VBox root = new VBox(10,
+                usernameField, loginButton, loginStatusLabel,
+                versionCombo, downloadButton,
+                progressBar, statusLabel,
+                ramField, launchButton
+        );
         root.setPadding(new Insets(20));
 
-        // 6) Configurar y mostrar la escena
-        Scene scene = new Scene(root, 400, 200);
+        stage.setScene(new Scene(root, 450, 380));
         stage.setTitle("MC Yagua Launcher");
-        stage.setScene(scene);
         stage.show();
 
-        // 7) Inicializar gestores de versiones y downloader
-        versionManager = new VersionManager();
-        assetDownloader = new AssetDownloader(); // Asignar al campo
+        // 4) Eventos
+        loginButton    .setOnAction(e -> performLogin());
+        downloadButton .setOnAction(e -> downloadVersionAssets());
+        launchButton   .setOnAction(e -> launchGame());
+        versionCombo   .getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+            onVersionSelected(newV);
+        });
 
-        // 8) Cargar versiones en segundo plano y luego habilitar descarga
+        // 5) Intentar cargar sesión previa y escanear versiones instaladas
+        loadExistingSession();
+        scanInstalledVersions();
+    }
+
+    private void loadExistingSession() {
+        try {
+            AuthManager.Session s = authManager.loadSession();
+            if (s != null) {
+                session = s;
+                onLoginSuccess(s);
+            }
+        } catch (Exception ex) {
+            loginStatusLabel.setText("No hay sesión previa.");
+        }
+    }
+
+    private void performLogin() {
+        String user = usernameField.getText().trim();
+        if (user.isEmpty()) {
+            loginStatusLabel.setText("Ingresa un nombre de usuario.");
+            return;
+        }
+        session = authManager.loginOffline(user);
+        try {
+            authManager.saveSession(session);
+            onLoginSuccess(session);
+        } catch (Exception ex) {
+            loginStatusLabel.setText("Error guardando sesión.");
+            ex.printStackTrace();
+        }
+    }
+
+    private void onLoginSuccess(AuthManager.Session s) {
+        loginStatusLabel.setText("Sesión: " + s.getUsername() + " (" + s.getUuid() + ")");
+        usernameField.setDisable(true);
+        loginButton  .setDisable(true);
+
+        versionCombo.setDisable(false);
         loadVersionsAsync();
-
-        // 9) Acción del botón para descargar la versión seleccionada
-        downloadButton.setOnAction(e -> downloadVersionAssets());
     }
 
     /**
-     * Carga el manifiesto de versiones y actualiza el ComboBox con IDs.
-     * Se ejecuta en un Task para no bloquear la UI.
+     * Escanea ~/.minecraft/versions para saber qué versiones ya están instaladas.
      */
+    private void scanInstalledVersions() {
+        installedVersions.clear();
+        Path versionsDir = mcBaseDir.resolve("versions");
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(versionsDir)) {
+            for (Path vdir : ds) {
+                if (Files.isDirectory(vdir)) {
+                    Path jar = vdir.resolve(vdir.getFileName().toString() + ".jar");
+                    if (Files.exists(jar)) {
+                        installedVersions.add(vdir.getFileName().toString());
+                    }
+                }
+            }
+        } catch (IOException ignored) { }
+    }
+
     private void loadVersionsAsync() {
-        Task<List<String>> task = new Task<>() {
-            @Override
-            protected List<String> call() throws Exception {
+        downloadButton.setDisable(true);
+        Task<List<String>> t = new Task<>() {
+            @Override protected List<String> call() throws Exception {
                 versionManager.fetchManifest();
-                return versionManager.getVersionsIds();  // Nombre correcto del método
+                return versionManager.getVersionsIds();
             }
         };
-
-        task.setOnSucceeded(evt -> {
-            List<String> ids = task.getValue();
+        t.setOnSucceeded(evt -> {
+            List<String> ids = t.getValue();
             versionCombo.getItems().setAll(ids);
-            statusLabel.setText("Versiones cargadas: " + ids.size());
+            statusLabel.setText("Versiones remotas cargadas: " + ids.size());
         });
-        task.setOnFailed(evt -> statusLabel.setText("Error al cargar versiones"));
-
-        Thread thread = new Thread(task);
-        thread.setDaemon(true);
-        thread.start();
+        t.setOnFailed(evt -> statusLabel.setText("Error cargando versiones"));
+        new Thread(t) {{ setDaemon(true); }}.start();
     }
 
     /**
-     * Inicia la descarga de librerías y cliente para la versión seleccionada.
+     * Gestiona UI al seleccionar una versión:
+     * - Si está instalada: habilita lanzamiento directo.
+     * - Si no: habilita botón de descarga.
      */
+    private void onVersionSelected(String ver) {
+        if (ver == null) return;
+        if (installedVersions.contains(ver)) {
+            statusLabel.setText("Versión " + ver + " ya instalada.");
+            downloadButton.setDisable(true);
+            ramField.setDisable(false);
+            launchButton.setDisable(false);
+        } else {
+            statusLabel.setText("");
+            downloadButton.setDisable(false);
+            ramField.setDisable(true);
+            launchButton.setDisable(true);
+        }
+    }
+
     private void downloadVersionAssets() {
-        String selected = versionCombo.getValue();
-        if (selected == null) {
+        String ver = versionCombo.getValue();
+        if (ver == null) {
             statusLabel.setText("Primero elige una versión");
             return;
         }
+        ramField.setDisable(false);
 
-        Task<Void> downloadTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                updateMessage("Obteniendo detalles de versión...");
-                VersionDetails details = versionManager.fetchVersionDetails(selected);
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
+                updateMessage("Descargando detalles de versión...");
+                VersionDetails det = versionManager.fetchVersionDetails(ver);
 
-                int total = details.getLibraries().size() + 1;
-                int count = 0;
+                // 1) Descargar librerías + cliente
+                int libs      = det.getLibraries().size();
+                int coreTotal = libs + 1;
+                int coreDone  = 0;
 
-                // Descargar cada librería y verificar SHA-1
-                for (VersionDetails.Library lib : details.getLibraries()) {
-                    String url = lib.getDownloads().getArtifact().getUrl();
+                for (var lib : det.getLibraries()) {
+                    String url  = lib.getDownloads().getArtifact().getUrl();
                     String sha1 = lib.getDownloads().getArtifact().getSha1();
-
                     Path target = mcBaseDir.resolve("libraries")
                             .resolve(Paths.get(pathFromUrl(url)));
-
                     updateMessage("Descargando librería: " + target.getFileName());
                     assetDownloader.downloadAndVerify(url, target, sha1);
-
-                    count++;
-                    updateProgress(count, total);
+                    updateProgress(++coreDone, coreTotal);
                 }
 
-                // Descargar el client.jar
-                VersionDetails.ClientDownload client = details.getClientDownload();
-                Path clientTarget = mcBaseDir.resolve("versions")
-                        .resolve(selected)
-                        .resolve(selected + ".jar");
+                var cd         = det.getClientDownload();
+                Path clientPath = mcBaseDir.resolve("versions")
+                        .resolve(ver)
+                        .resolve(ver + ".jar");
+                updateMessage("Descargando cliente: " + ver + ".jar");
+                assetDownloader.downloadAndVerify(cd.getUrl(), clientPath, cd.getSha1());
+                updateProgress(++coreDone, coreTotal);
 
-                updateMessage("Descargando cliente: " + clientTarget.getFileName());
-                assetDownloader.downloadAndVerify(client.getUrl(), clientTarget, client.getSha1());
-                count++;
-                updateProgress(count, total);
+                // 2) Descargar assets
+                updateMessage("Obteniendo asset index...");
+                var aiInfo = det.getAssetIndex();
+                AssetsManager.AssetIndex ai =
+                        assetsManager.fetchAssetIndex(aiInfo.getUrl(), aiInfo.getId());
+                Map<String, AssetsManager.AssetObject> objects = ai.objects;
 
-                updateMessage("Descarga completada");
+                int assetsTotal  = objects.size();
+                int overallTotal = coreTotal + assetsTotal;
+                int overallDone  = coreDone;
+                int count        = 0;
+
+                for (var entry : objects.entrySet()) {
+                    String key  = entry.getKey();
+                    String hash = entry.getValue().hash;
+                    updateMessage("Descargando asset " + (++count)
+                            + " de " + assetsTotal + ": " + key);
+                    assetsManager.downloadSingleAsset(key, hash);
+                    updateProgress(++overallDone, overallTotal);
+                }
+
+                updateMessage("Descarga completa de librerías, cliente y assets.");
+                // Marcar como instalada
+                installedVersions.add(ver);
                 return null;
             }
         };
 
-        // Enlazar barra de progreso y etiqueta a la tarea
-        progressBar.progressProperty().bind(downloadTask.progressProperty());
+        progressBar.progressProperty().bind(task.progressProperty());
         progressBar.setVisible(true);
-        statusLabel.textProperty().bind(downloadTask.messageProperty());
+        statusLabel.textProperty().bind(task.messageProperty());
 
-        downloadTask.setOnSucceeded(evt -> {
+        task.setOnSucceeded(evt -> {
             statusLabel.textProperty().unbind();
-            statusLabel.setText("Todos los archivos descargados correctamente");
+            statusLabel.setText("¡Listo para lanzar!");
+            launchButton.setDisable(false);
         });
-        downloadTask.setOnFailed(evt -> {
+        task.setOnFailed(evt -> {
             statusLabel.textProperty().unbind();
             statusLabel.setText("Error durante la descarga");
-            downloadTask.getException().printStackTrace();
+            task.getException().printStackTrace();
         });
 
-        Thread thread = new Thread(downloadTask);
-        thread.setDaemon(true);
-        thread.start();
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
-    /**
-     * Extrae la ruta del recurso desde su URL, p.ej.:
-     * https://.../com/mojang/xyz/1.0/xyz-1.0.jar -> com/mojang/xyz/1.0/xyz-1.0.jar
-     */
-    private String pathFromUrl(String url) {
-        return url.substring(url.indexOf("/com/"));
+    private void launchGame() {
+        String ver = versionCombo.getValue();
+        int ram;
+        try {
+            ram = Integer.parseInt(ramField.getText().trim());
+        } catch (NumberFormatException ex) {
+            statusLabel.setText("RAM inválida.");
+            return;
+        }
+
+        new Thread(() -> {
+            Platform.runLater(() -> statusLabel.setText("Lanzando juego…"));
+            try {
+                launchExecutor.launch(session, ver, mcBaseDir.toFile(), ram);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                Platform.runLater(() -> statusLabel.setText("Error al lanzar el juego"));
+            }
+        }).start();
+    }
+
+    /** Extrae la ruta de la URL (sin la barra inicial) */
+    private String pathFromUrl(String url) throws URISyntaxException {
+        URI uri = new URI(url);
+        String p = uri.getPath();
+        return p.startsWith("/") ? p.substring(1) : p;
     }
 
     public static void main(String[] args) {
