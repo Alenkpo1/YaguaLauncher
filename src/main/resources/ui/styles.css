@@ -1,0 +1,61 @@
+/* Root gradient */
+.root {
+    -fx-background-color:
+            linear-gradient(from 0% 0% to 100% 100%,
+            #4e00c2 0%, #8e2de2 50%, #4e00c2 100%);
+    -fx-font-family: "FSP DEMO - Cera Pro", sans-serif;
+    -fx-text-fill: white;
+}
+
+/* Barra lateral */
+.nav-bar {
+    -fx-background-color: rgba(0,0,0,0.2);
+    -fx-padding: 10;
+}
+.nav-button {
+    -fx-background-color: transparent;
+}
+.nav-button:selected {
+    -fx-background-color: rgba(255,255,255,0.1);
+}
+
+/* Contenedores de sección */
+.section-pane {
+    -fx-background-color: rgba(255,255,255,0.05);
+    -fx-border-color: rgba(255,255,255,0.3);
+    -fx-border-width: 1;
+}
+.section-pane > .label {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+/* Filas internas */
+.section-row {
+    -fx-alignment: center-left;
+    -fx-spacing: 10;
+}
+
+/* Botones */
+.button {
+    -fx-background-color: transparent;
+    -fx-border-color: white;
+    -fx-border-width: 1;
+    -fx-text-fill: white;
+}
+.button:hover {
+    -fx-background-color: rgba(255,255,255,0.2);
+}
+
+/* Inputs */
+.text-field, .combo-box {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-border-color: rgba(255,255,255,0.6);
+    -fx-border-width: 1;
+    -fx-text-fill: white;
+}
+
+/* ProgressBar */
+.progress-bar {
+    -fx-accent: #8e2de2;
+}

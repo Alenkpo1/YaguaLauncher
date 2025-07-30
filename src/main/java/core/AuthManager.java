@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 
@@ -33,6 +34,7 @@ public class AuthManager {
         return session;
     }
 
+
     /**
      * Guarda la sesión en el archivo local (~/.minecraft/session.json).
      * Crea directorios padre si es necesario.
@@ -47,6 +49,11 @@ public class AuthManager {
         Files.writeString(sessionPath, json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
+    public void clearSession() throws IOException {
+        Path home = Paths.get(System.getProperty("user.home"), ".minecraft");
+        Path f    = home.resolve("session.json");
+        Files.deleteIfExists(f);
+    }
     /**
      * Carga la sesión existente desde el archivo local.
      * @return Session cargada, o null si no existe

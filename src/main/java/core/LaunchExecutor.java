@@ -5,86 +5,106 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Ejecuta el cliente de Minecraft en modo offline, construyendo el classpath,
- * los argumentos de JVM y de aplicación (username, version, uuid).
- */
 public class LaunchExecutor {
     private final String javaBin;
     private final String mainClass;
 
-    /**
-     * @param javaHome Ruta al directorio del JDK (contiene bin/java)
-     */
     public LaunchExecutor(String javaHome) {
-        // Ruta al ejecutable java
-        this.javaBin = javaHome + File.separator + "bin" + File.separator + "java";
-        // Clase principal del cliente en versiones modernas
+        this.javaBin   = javaHome + File.separator + "bin" + File.separator + "java";
         this.mainClass = "net.minecraft.client.main.Main";
     }
 
-    /**
-     * Lanza el proceso de Minecraft con los parámetros dados.
-     * @param session Sesión offline con username y uuid (de AuthManager.Session)
-     * @param versionId ID de la versión (p.ej. "1.20.1")
-     * @param gameDir Directorio .minecraft de usuario
-     * @param ramMb Cantidad de memoria máxima para JVM (en MB)
-     * @throws IOException          si falla la ejecución
-     * @throws InterruptedException si el proceso se interrumpe
-     */
-    public void launch(core.AuthManager.Session session, String versionId, File gameDir, int ramMb)
-            throws IOException, InterruptedException {
-        // 1) Construir classpath: versión Jar + librerías
-        List<String> cpEntries = new ArrayList<>();
-        File versionJar = new File(gameDir,
+    public void launch(AuthManager.Session session,
+                       String versionId,
+                       File gameDir,
+                       int ramMb) throws IOException, InterruptedException
+    {
+        // 1) Cargo detalles para assetIndex
+        VersionDetails det = new VersionManager().fetchVersionDetails(versionId);
+        String assetIndexId = det.getAssetIndex().getId();
+        String assetsDir    = new File(gameDir, "assets").getAbsolutePath();
+
+        // 2) Armo el classpath (versión Jar + todas las librerías)
+        List<String> cp = new ArrayList<>();
+        File vJar = new File(gameDir,
                 "versions" + File.separator + versionId + File.separator + versionId + ".jar");
-        cpEntries.add(versionJar.getAbsolutePath());
+        cp.add(vJar.getAbsolutePath());
+        collectJars(new File(gameDir, "libraries"), cp);
+        String classpath = String.join(File.pathSeparator, cp);
 
-        // Incluir todas las librerías bajo 'libraries'
-        File librariesDir = new File(gameDir, "libraries");
-        collectJars(librariesDir, cpEntries);
-
-        String classpath = String.join(File.pathSeparator, cpEntries);
-
-        // 2) Construir lista de argumentos para java
+        // 3) Empiezo a montar el comando
         List<String> cmd = new ArrayList<>();
         cmd.add(javaBin);
         cmd.add("-Xmx" + ramMb + "M");
-        cmd.add("-Djava.library.path=" + new File(gameDir,
-                "versions" + File.separator + versionId + File.separator + "natives").getAbsolutePath());
+        cmd.add("-Djava.library.path=" +
+                new File(gameDir,
+                        "versions" + File.separator + versionId + File.separator + "natives")
+                        .getAbsolutePath());
         cmd.add("-cp");
         cmd.add(classpath);
         cmd.add(mainClass);
-        cmd.add("--username");
-        cmd.add(session.getUsername());
-        cmd.add("--uuid");
-        cmd.add(session.getUuid());
-        // Para uso offline, también es necesario un accessToken (se puede reusar el UUID)
-        cmd.add("--accessToken");
-        cmd.add(session.getUuid());
+
+        // 4) Flags de Minecraft (¡dos guiones siempre!)
         cmd.add("--version");
         cmd.add(versionId);
+
+        // Reintroducimos versionType, obligatorio
+        String type = versionId.matches("\\d{2}w\\d{2}[a-z]") ? "snapshot" : "release";
+        cmd.add("--versionType");
+        cmd.add("release");
+        cmd.add(type);
+
         cmd.add("--gameDir");
         cmd.add(gameDir.getAbsolutePath());
 
-        // 3) Ejecutar y esperar terminación
+        cmd.add("--assetsDir");
+        cmd.add(assetsDir);
+
+        cmd.add("--assetIndex");
+        cmd.add(assetIndexId);
+
+        cmd.add("--uuid");
+        cmd.add(session.getUuid());
+
+        cmd.add("--accessToken");
+        cmd.add(session.getUuid());
+
+        cmd.add("--userProperties");
+        cmd.add("{}");
+
+        cmd.add("--userType");
+        cmd.add("legacy");
+
+        cmd.add("--username");
+        cmd.add(session.getUsername());
+
+        // Opcionales: tamaño de ventana
+        cmd.add("--width");
+        cmd.add("854");
+        cmd.add("--height");
+        cmd.add("480");
+
+        // DEBUG: mostramos la línea completa
+        System.out.println("=== Minecraft CMD ===");
+        System.out.println(String.join(" ", cmd));
+        System.out.println("=====================");
+
+        // 5) Ejecutamos
         ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.inheritIO(); // Conecta stdin/stdout/stderr
-        Process proc = pb.start();
-        proc.waitFor();
+        pb.inheritIO();
+        Process p = pb.start();
+        p.waitFor();
     }
 
-    /**
-     * Recorre recursivamente un directorio y añade todos los .jar encontrados.
-     */
-    private void collectJars(File dir, List<String> collector) {
+    /** Añade recursivamente todos los JARs que encuentre en 'dir' */
+    private void collectJars(File dir, List<String> out) {
         File[] files = dir.listFiles();
         if (files == null) return;
         for (File f : files) {
             if (f.isDirectory()) {
-                collectJars(f, collector);
+                collectJars(f, out);
             } else if (f.getName().endsWith(".jar")) {
-                collector.add(f.getAbsolutePath());
+                out.add(f.getAbsolutePath());
             }
         }
     }

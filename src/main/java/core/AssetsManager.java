@@ -47,6 +47,15 @@ public class AssetsManager {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AssetObject {
         public String hash;
+
+        public String getHash() {
+            return hash;
+        }
+        public void setHash(String hash) {
+            this.hash = hash;
+        }
+
+
     }
 
     /**

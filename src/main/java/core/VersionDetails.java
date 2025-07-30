@@ -96,6 +96,11 @@ public class VersionDetails {
     public AssetIndexInfo getAssetIndex() { return assetIndex; }
     public void setAssetIndex(AssetIndexInfo assetIndex) { this.assetIndex = assetIndex; }
 
+    @JsonProperty("type")
+    private String type;
+    public String getType() { return type; }
+
+
     /** Clase que mapea los campos de assetIndex */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AssetIndexInfo {
