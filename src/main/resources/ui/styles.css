@@ -9,14 +9,28 @@
 
 /* Barra lateral */
 .nav-bar {
+    -fx-pref-width: 80px;                /* ancho fijo */
     -fx-background-color: rgba(0,0,0,0.2);
-    -fx-padding: 10;
+    -fx-padding: 20 10;                  /* arriba/abajo 20, izquierda/derecha 10 */
+    -fx-spacing: 20;                     /* separa botones */
 }
+
 .nav-button {
     -fx-background-color: transparent;
 }
 .nav-button:selected {
     -fx-background-color: rgba(255,255,255,0.1);
+}
+
+.big-play-button {
+    -fx-font-size: 16px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 15 40;      /* arriba/abajo 15px, izquierda/derecha 40px */
+    -fx-min-width: 240px;    /* ancho mínimo */
+    -fx-min-height: 60px;    /* alto mínimo */
+    -fx-border-color: white;
+    -fx-border-width: 2;
 }
 
 /* Contenedores de sección */
@@ -58,4 +72,29 @@
 /* ProgressBar */
 .progress-bar {
     -fx-accent: #8e2de2;
+}
+
+/* Contenedor del indicador de servidor */
+.server-status-box {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-border-color: rgba(255,255,255,0.3);
+    -fx-border-width: 1;
+    -fx-padding: 5 10;
+    -fx-spacing: 8;
+}
+
+/* Nombre del servidor */
+.server-name {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.server-ping {
+    -fx-text-fill: #ddd;
+    -fx-font-size: 12px;
+}
+
+/* Círculo de estado (el fill se controla desde el código) */
+.server-circle {
+    /* podrías colocar un color por defecto transparente aquí */
 }

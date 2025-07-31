@@ -10,31 +10,60 @@ import core.ProfileManager;
 import core.ProfileManager.Profile;
 import core.VersionDetails;
 import core.VersionManager;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
+import javafx.scene.Cursor;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.Priority;
+import javafx.application.Platform;
+import javafx.util.Duration;
+
+import java.awt.*;
+import java.net.*;
+
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.InetAddress;
 import java.nio.file.*;
 import java.util.*;
+import java.util.List;
+import java.util.stream.Stream;
+
+
 
 public class MainWindow extends Application {
     // — Directorio Minecraft (~/.minecraft o %APPDATA%/.minecraft)
     private final Path mcBaseDir = computeMcBaseDir();
 
+    private final String SERVER_HOST = "26.56.106.170";
+    private final int    SERVER_PORT = 25565;
+    private final String SERVER_NAME = "Server AlenyToti";
     // — Managers
     private AuthManager     authManager;
     private ProfileManager  profileManager;
@@ -65,7 +94,8 @@ public class MainWindow extends Application {
     // — Controles sección Perfiles
     private ComboBox<String> profileCombo;
     private Button           newProfileBtn, saveProfileBtn, deleteProfileBtn;
-
+    private Label serverNameLabel;
+    private Circle serverStatusCircle;
     // — Controles sección Versiones
     private CheckBox         showSnapshotsCheckBox;
     private ComboBox<String> versionCombo;
@@ -76,6 +106,9 @@ public class MainWindow extends Application {
     // — Controles sección Lanzamiento
     private TextField ramField;
     private Button    launchButton;
+    private Label  serverLabel;
+    private Label  pingLabel;
+
 
     public static void main(String[] args) {
         launch();
@@ -111,6 +144,44 @@ public class MainWindow extends Application {
         stage.show();
     }
 
+    public static class Server {
+        private final String name;
+        private final String address;
+        public final SimpleStringProperty latency = new SimpleStringProperty("…");
+
+        public Server(String name, String address) {
+            this.name = name;
+            this.address = address;
+        }
+        public String getName()    { return name; }
+        public String getAddress() { return address; }
+    }
+
+    private ObservableList<Server> loadServers() {
+        // Aquí defines tus servidores fijos o los lees de un archivo
+        return FXCollections.observableArrayList(
+                new Server("Servidor A", "mc.hypixel.net")
+        );
+    }
+
+    private void pingServer() {
+        new Thread(() -> {
+            try (var socket = new Socket()) {
+                long start = System.currentTimeMillis();
+                socket.connect(new InetSocketAddress(SERVER_HOST, SERVER_PORT), 1000);
+                long ms = System.currentTimeMillis() - start;
+                Platform.runLater(() -> {
+                    pingLabel.setText(ms + " ms");
+                    serverStatusCircle.setFill(Color.LIMEGREEN);
+                });
+            } catch (IOException ex) {
+                Platform.runLater(() -> {
+                    pingLabel.setText("offline");
+                    serverStatusCircle.setFill(Color.RED);
+                });
+            }
+        }, "Ping-Server").start();
+    }
     private Scene buildLoginScene(Stage stage) {
         usernameField    = new TextField();
         usernameField.setPromptText("Usuario offline");
@@ -156,11 +227,11 @@ public class MainWindow extends Application {
         StackPane.setAlignment(overlay, Pos.CENTER_LEFT);
         StackPane.setMargin(overlay, new Insets(0,0,0,50));
 
-        return new Scene(root, 854, 480);
+        return new Scene(root, 1024, 576);
     }
 
     private Scene buildMainScene(Stage stage) {
-        // Barra lateral
+        // 1) Botones laterales
         navHome     = makeNavButton("/ui/icons/home.png");
         navProfiles = makeNavButton("/ui/icons/user.png");
         navVersions = makeNavButton("/ui/icons/versions.png");
@@ -172,12 +243,13 @@ public class MainWindow extends Application {
         }
         navHome.setSelected(true);
 
+        // Marco lateral (nav-bar)
         VBox navBar = new VBox(20, navHome, navProfiles, navVersions, navLaunch);
         navBar.setPadding(new Insets(20));
         navBar.getStyleClass().add("nav-bar");
 
-        // Secciones
-        buildHomePane();
+        // 2) Paneles de cada sección
+        buildHomePane();      // donde está tu botón JUGAR
         buildProfilesPane();
         buildVersionsPane();
         buildLaunchPane();
@@ -189,16 +261,60 @@ public class MainWindow extends Application {
         navVersions.setOnAction(e -> showOnly(versionsPane));
         navLaunch .setOnAction(e -> showOnly(launchPane));
 
+        // 3) Contenedor principal
         BorderPane root = new BorderPane();
-        root.setLeft(navBar);
-        root.setCenter(content);
         root.setPadding(new Insets(10));
         root.getStyleClass().add("root");
 
+        // Ponemos navBar a la izquierda y forzamos su altura
+        root.setLeft(navBar);
+        navBar.prefHeightProperty().bind(root.heightProperty());
+
+        // Centro: tu contenido
+        root.setCenter(content);
+
+        // 4) Indicador de servidor (top-right)
+        serverLabel = new Label(SERVER_NAME);
+        serverLabel.getStyleClass().add("server-name");
+        serverLabel.setCursor(Cursor.DEFAULT);
+
+        pingLabel = new Label("…");
+        pingLabel.getStyleClass().add("server-ping");
+
+        serverStatusCircle = new Circle(6);
+        serverStatusCircle.getStyleClass().add("server-circle");
+        serverStatusCircle.setStroke(Color.WHITE);
+        serverStatusCircle.setStrokeWidth(1);
+        serverStatusCircle.setFill(Color.GRAY);
+
+        HBox serverBox = new HBox(5, serverStatusCircle, serverLabel, pingLabel);
+        serverBox.getStyleClass().add("server-status-box");
+        serverBox.setAlignment(Pos.CENTER);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox topBar = new HBox(spacer, serverBox);
+        topBar.setPadding(new Insets(8));
+        topBar.setAlignment(Pos.CENTER_RIGHT);
+
+        root.setTop(topBar);
+
+        // 5) Creamos la escena y cargamos el CSS
         Scene scene = new Scene(root, 854, 480);
         scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
+
+        // 6) Inicio ping periódico
+        Timeline pingTimer = new Timeline(
+                new KeyFrame(Duration.ZERO, e -> pingServer()),
+                new KeyFrame(Duration.seconds(5))
+        );
+        pingTimer.setCycleCount(Animation.INDEFINITE);
+        pingTimer.play();
+
         return scene;
     }
+
+
 
     private ToggleButton makeNavButton(String path) {
         InputStream is = getClass().getResourceAsStream(path);
@@ -439,43 +555,60 @@ public class MainWindow extends Application {
         launchButton .setDisable(!inst);
     }
 
-    private void downloadVersionAssets(){
+    private void downloadVersionAssets() {
         String ver = versionCombo.getValue();
-        if(ver==null){
+        if (ver == null) {
             statusLabel.setText("Primero elige una versión.");
             return;
         }
+
         Task<Void> task = new Task<>() {
-            @Override protected Void call() throws Exception {
+            @Override
+            protected Void call() throws Exception {
+                // 1) Prepara un directorio "limpio" para la versión
+                Path versionDir = mcBaseDir.resolve("versions").resolve(ver);
+                if (Files.exists(versionDir)) {
+                    // Borra recursivamente cualquier resto de descargas previas
+                    try (Stream<Path> walk = Files.walk(versionDir)) {
+                        walk.sorted(Comparator.reverseOrder())
+                                .forEach(p -> {
+                                    try { Files.delete(p); }
+                                    catch (IOException ignored) {}
+                                });
+                    }
+                }
+                // Crea el directorio de la versión de nuevo
+                Files.createDirectories(versionDir);
+
+                // 2) Obtiene los detalles de la versión
                 VersionDetails det = versionManager.fetchVersionDetails(ver);
 
-                // librerías + jar:
-                int libs = det.getLibraries().size(),
-                        coreTotal = libs + 1,
-                        coreDone  = 0;
-                for(var lib : det.getLibraries()){
-                    String url  = lib.getDownloads().getArtifact().getUrl(),
-                            sha  = lib.getDownloads().getArtifact().getSha1();
-                    Path tgt = mcBaseDir.resolve("libraries")
+                // 3) Descarga librerías
+                int libs      = det.getLibraries().size();
+                int coreTotal = libs + 1;
+                int coreDone  = 0;
+                for (var lib : det.getLibraries()) {
+                    String url = lib.getDownloads().getArtifact().getUrl();
+                    String sha = lib.getDownloads().getArtifact().getSha1();
+                    Path tgt   = mcBaseDir.resolve("libraries")
                             .resolve(Paths.get(pathFromUrl(url)));
                     updateMessage("Librería: " + tgt.getFileName());
                     assetDownloader.downloadAndVerify(url, tgt, sha);
                     updateProgress(++coreDone, coreTotal);
                 }
-                // cliente jar:
+
+                // 4) Descarga el JAR del cliente
                 var cd = det.getClientDownload();
-                Path clientJar = mcBaseDir.resolve("versions")
-                        .resolve(ver)
-                        .resolve(ver + ".jar");
+                Path clientJar = versionDir.resolve(ver + ".jar");
                 updateMessage("Cliente: " + ver + ".jar");
                 assetDownloader.downloadAndVerify(cd.getUrl(), clientJar, cd.getSha1());
                 updateProgress(++coreDone, coreTotal);
 
-                // assets:
+                // 5) Descarga los assets
                 VersionDetails.AssetIndexInfo aiInfo = det.getAssetIndex();
                 AssetIndex ai = assetsManager.fetchAssetIndex(aiInfo.getUrl(), aiInfo.getId());
                 int totalA = ai.objects.size(), doneA = 0;
-                for(Map.Entry<String, AssetObject> e : ai.objects.entrySet()){
+                for (Map.Entry<String, AssetObject> e : ai.objects.entrySet()) {
                     String objectKey = e.getKey();
                     String hash      = e.getValue().getHash();
                     updateMessage("Asset " + (++doneA) + "/" + totalA + ": " + objectKey);
@@ -483,27 +616,32 @@ public class MainWindow extends Application {
                     updateProgress(coreDone + doneA, coreTotal + totalA);
                 }
 
+                // 6) Marca la versión como instalada
                 installedVersions.add(ver);
                 updateMessage("¡Descarga completa!");
                 return null;
             }
         };
 
+        // Bindings con la UI
         progressBar.progressProperty().bind(task.progressProperty());
         progressBar.setVisible(true);
         statusLabel.textProperty().bind(task.messageProperty());
-        task.setOnSucceeded(evt->{
+
+        task.setOnSucceeded(evt -> {
             statusLabel.textProperty().unbind();
             statusLabel.setText("¡Listo para lanzar!");
             launchButton.setDisable(false);
         });
-        task.setOnFailed(evt->{
+        task.setOnFailed(evt -> {
             statusLabel.textProperty().unbind();
             statusLabel.setText("Error durante descarga");
             task.getException().printStackTrace();
         });
-        new Thread(task){{ setDaemon(true); }}.start();
+
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
+
 
     private void launchGame(){
         String ver = versionCombo.getValue();
