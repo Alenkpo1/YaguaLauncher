@@ -26,6 +26,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -87,9 +89,12 @@ public class MainWindow extends Application {
 
     // — Navegación lateral
     private ToggleButton navHome, navProfiles, navVersions, navLaunch;
+    private ToggleButton navConsole;
 
     // — Panes de contenido
     private VBox homePane, profilesPane, versionsPane, launchPane;
+    private VBox consolePane;
+
 
     // — Controles sección Perfiles
     private ComboBox<String> profileCombo;
@@ -103,6 +108,7 @@ public class MainWindow extends Application {
     private ProgressBar      progressBar;
     private Label            statusLabel;
 
+    private TextArea consoleTextArea;
     // — Controles sección Lanzamiento
     private TextField ramField;
     private Button    launchButton;
@@ -164,6 +170,21 @@ public class MainWindow extends Application {
         return FXCollections.observableArrayList(
                 new Server("Servidor A", "mc.hypixel.net")
         );
+    }
+
+    private void buildConsolePane() {
+        consoleTextArea = new TextArea();
+        consoleTextArea.setEditable(false);
+        consoleTextArea.getStyleClass().add("console-text-area");
+
+        consoleTextArea.setStyle("-fx-font-family: monospace;");
+        ScrollPane sp = new ScrollPane(consoleTextArea);
+        sp.setFitToWidth(true);
+        sp.setFitToHeight(true);
+
+        consolePane = new VBox(sp);
+        consolePane.setPadding(new Insets(10));
+        consolePane.getStyleClass().add("section-pane");
     }
 
     private void pingServer() {
@@ -245,14 +266,15 @@ public class MainWindow extends Application {
         navProfiles = makeNavButton("/ui/icons/user.png");
         navVersions = makeNavButton("/ui/icons/versions.png");
         navLaunch   = makeNavButton("/ui/icons/play.png");
+        navConsole  = makeNavButton("/ui/icons/console.png");
         ToggleGroup navGroup = new ToggleGroup();
-        for (var tb : List.of(navHome, navProfiles, navVersions, navLaunch)) {
+        for (var tb : List.of(navHome, navProfiles, navVersions, navLaunch, navConsole)) {
             tb.setToggleGroup(navGroup);
             tb.getStyleClass().add("nav-button");
         }
         navHome.setSelected(true);
 
-        VBox navBar = new VBox(20, navHome, navProfiles, navVersions, navLaunch);
+        VBox navBar = new VBox(20, navHome, navProfiles, navVersions, navLaunch, navConsole);
         navBar.setPadding(new Insets(20));
         navBar.getStyleClass().add("nav-bar");
 
@@ -261,12 +283,14 @@ public class MainWindow extends Application {
         buildProfilesPane();
         buildVersionsPane();
         buildLaunchPane();
-        StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane);
+        buildConsolePane();
+        StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane, consolePane);
         showOnly(homePane);
         navHome    .setOnAction(e -> showOnly(homePane));
         navProfiles.setOnAction(e -> showOnly(profilesPane));
         navVersions.setOnAction(e -> showOnly(versionsPane));
         navLaunch  .setOnAction(e -> showOnly(launchPane));
+        navConsole .setOnAction(e -> showOnly(consolePane));
 
         // 3) Indicador de servidor arriba, dentro del layout principal
         serverLabel = new Label(SERVER_NAME);
@@ -405,6 +429,7 @@ public class MainWindow extends Application {
         profilesPane.setVisible(false);
         versionsPane.setVisible(false);
         launchPane.setVisible(false);
+        consolePane.setVisible(false);
         pane.setVisible(true);
     }
 
@@ -710,27 +735,37 @@ public class MainWindow extends Application {
     }
 
 
-    private void launchGame(){
+    private void launchGame() {
         String ver = versionCombo.getValue();
-        if(ver==null){
+        if (ver == null) {
             statusLabel.setText("Selecciona una versión primero.");
             return;
         }
         int ram;
         try { ram = Integer.parseInt(ramField.getText().trim()); }
-        catch(NumberFormatException ex){
+        catch (NumberFormatException ex) {
             statusLabel.setText("RAM inválida.");
             return;
         }
+
+        // Limpio la consola antes de ejecutar
+        consoleTextArea.clear();
+        statusLabel.setText("Lanzando…");
+
         new Thread(() -> {
-            Platform.runLater(() -> statusLabel.setText("Lanzando…"));
             try {
-                launchExecutor.launch(session, ver, mcBaseDir.toFile(), ram);
-            } catch(Exception ex){
+                launchExecutor.launch(
+                        session, ver, mcBaseDir.toFile(), ram,
+                        null, 0,  // sin auto-connect en este ejemplo
+                        line -> Platform.runLater(() -> consoleTextArea.appendText(line + "\n")),
+                        err  -> Platform.runLater(() -> consoleTextArea.appendText("[ERR] " + err + "\n"))
+                );
+                Platform.runLater(() -> statusLabel.setText("¡Juego cerrado!"));
+            } catch (Exception ex) {
                 ex.printStackTrace();
                 Platform.runLater(() -> statusLabel.setText("Error al lanzar"));
             }
-        }).start();
+        }, "Launcher-Process").start();
     }
 
     private String pathFromUrl(String url) throws URISyntaxException {
