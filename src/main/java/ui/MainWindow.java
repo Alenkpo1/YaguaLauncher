@@ -301,7 +301,9 @@ public class MainWindow extends Application {
 
         // 5) Creamos la escena y cargamos el CSS
         Scene scene = new Scene(root, 854, 480);
-        scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
+        String cssPath = Paths.get("src/main/resources/ui/styles.css").toUri().toString();
+        scene.getStylesheets().add(cssPath);
+        startCssWatcher(Paths.get("src/main/resources/ui/styles.css"), scene);
 
         // 6) Inicio ping periódico
         Timeline pingTimer = new Timeline(
@@ -314,7 +316,32 @@ public class MainWindow extends Application {
         return scene;
     }
 
-
+    private void startCssWatcher(Path cssFile, Scene scene) {
+        Thread watcher = new Thread(() -> {
+            try {
+                WatchService ws = FileSystems.getDefault().newWatchService();
+                cssFile.getParent().register(ws,
+                        StandardWatchEventKinds.ENTRY_MODIFY);
+                while (true) {
+                    WatchKey key = ws.take();
+                    for (var ev : key.pollEvents()) {
+                        Path changed = (Path)ev.context();
+                        if (changed.equals(cssFile.getFileName())) {
+                            Platform.runLater(() -> {
+                                scene.getStylesheets().clear();
+                                scene.getStylesheets().add(cssFile.toUri().toString());
+                            });
+                        }
+                    }
+                    key.reset();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, "CSS-Watcher");
+        watcher.setDaemon(true);
+        watcher.start();
+    }
 
     private ToggleButton makeNavButton(String path) {
         InputStream is = getClass().getResourceAsStream(path);
