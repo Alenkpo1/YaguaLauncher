@@ -34,7 +34,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
-
+import javafx.stage.StageStyle;
 import javafx.scene.Cursor;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -117,6 +117,8 @@ public class MainWindow extends Application {
     @Override
     public void start(Stage stage) {
         // Carga opcional de fuente
+        stage.initStyle(StageStyle.UNDECORATED);
+
         var fontUrl = getClass().getResource("/ui/fonts/CeraPro-Regular.otf");
         if (fontUrl != null) Font.loadFont(fontUrl.toExternalForm(), 12);
 
@@ -230,6 +232,7 @@ public class MainWindow extends Application {
         return new Scene(root, 1024, 576);
     }
 
+    private double xOffset, yOffset;
     private Scene buildMainScene(Stage stage) {
         // 1) Botones laterales
         navHome     = makeNavButton("/ui/icons/home.png");
@@ -256,24 +259,56 @@ public class MainWindow extends Application {
 
         StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane);
         showOnly(homePane);
-        navHome   .setOnAction(e -> showOnly(homePane));
+        navHome    .setOnAction(e -> showOnly(homePane));
         navProfiles.setOnAction(e -> showOnly(profilesPane));
         navVersions.setOnAction(e -> showOnly(versionsPane));
-        navLaunch .setOnAction(e -> showOnly(launchPane));
+        navLaunch  .setOnAction(e -> showOnly(launchPane));
 
-        // 3) Contenedor principal
+        // 3) Construcción del BorderPane principal
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
         root.getStyleClass().add("root");
-
-        // Ponemos navBar a la izquierda y forzamos su altura
         root.setLeft(navBar);
         navBar.prefHeightProperty().bind(root.heightProperty());
-
-        // Centro: tu contenido
         root.setCenter(content);
 
-        // 4) Indicador de servidor (top-right)
+        // ==== Barra de título custom ====
+        Label titleLabel = new Label("YaguaLauncher");
+        titleLabel.setTextFill(Color.WHITE);
+        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+
+        Button btnMin = new Button("-");
+        btnMin.getStyleClass().add("window-button");
+        btnMin.setOnAction(e -> stage.setIconified(true));
+
+        Button btnMax = new Button("▢");
+        btnMax.getStyleClass().add("window-button");
+        btnMax.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
+
+        Button btnClose = new Button("×");
+        btnClose.getStyleClass().addAll("window-button", "window-close");
+        btnClose.setOnAction(e -> stage.close());
+
+        HBox windowControls = new HBox(5, btnMin, btnMax, btnClose);
+        windowControls.setAlignment(Pos.CENTER_RIGHT);
+
+        Region dragSpacer = new Region();
+        HBox.setHgrow(dragSpacer, Priority.ALWAYS);
+
+        HBox titleBar = new HBox(10, titleLabel, dragSpacer, windowControls);
+        titleBar.setPadding(new Insets(5, 10, 5, 10));
+        titleBar.getStyleClass().add("window-title-bar");
+        titleBar.setOnMousePressed(ev -> {
+            xOffset = ev.getSceneX();
+            yOffset = ev.getSceneY();
+        });
+        titleBar.setOnMouseDragged(ev -> {
+            if (!stage.isMaximized()) {
+                stage.setX(ev.getScreenX() - xOffset);
+                stage.setY(ev.getScreenY() - yOffset);
+            }
+        });
+
+        // ==== Indicador de servidor ====
         serverLabel = new Label(SERVER_NAME);
         serverLabel.getStyleClass().add("server-name");
         serverLabel.setCursor(Cursor.DEFAULT);
@@ -291,23 +326,21 @@ public class MainWindow extends Application {
         serverBox.getStyleClass().add("server-status-box");
         serverBox.setAlignment(Pos.CENTER);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox topBar = new HBox(spacer, serverBox);
-        topBar.setPadding(new Insets(8));
-        topBar.setAlignment(Pos.CENTER_RIGHT);
+        // ==== Encabezado combinado ====
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox header = new HBox(titleBar, headerSpacer, serverBox);
+        header.setAlignment(Pos.CENTER_LEFT);
 
-        root.setTop(topBar);
+        root.setTop(header);
 
-        // 5) Creamos la escena y cargamos el CSS
+        // 4) Crear scena y aplicar CSS
         Scene scene = new Scene(root, 854, 480);
-        String cssPath = Paths.get("src/main/resources/ui/styles.css").toUri().toString();
-        scene.getStylesheets().add(cssPath);
-        startCssWatcher(Paths.get("src/main/resources/ui/styles.css"), scene);
+        scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
 
-        // 6) Inicio ping periódico
+        // 5) Iniciar ping periódico
         Timeline pingTimer = new Timeline(
-                new KeyFrame(Duration.ZERO, e -> pingServer()),
+                new KeyFrame(Duration.ZERO,    e -> pingServer()),
                 new KeyFrame(Duration.seconds(5))
         );
         pingTimer.setCycleCount(Animation.INDEFINITE);
@@ -315,6 +348,7 @@ public class MainWindow extends Application {
 
         return scene;
     }
+
 
     private void startCssWatcher(Path cssFile, Scene scene) {
         Thread watcher = new Thread(() -> {

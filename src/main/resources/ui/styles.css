@@ -11,7 +11,7 @@
 .nav-bar {
     -fx-pref-width: 80px;                /* ancho fijo */
     -fx-background-color: rgba(0,0,0,0.2);
-    -fx-padding: 20 10;                  /* arriba/abajo 20, izquierda/derecha 10 */
+    -fx-padding: 15 15;                  /* arriba/abajo 20, izquierda/derecha 10 */
     -fx-spacing: 20;                     /* separa botones */
 }
 
@@ -93,6 +93,32 @@
     -fx-text-fill: #ddd;
     -fx-font-size: 12px;
 }
+
+
+/* Barra de título custom */
+.window-title-bar {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%,
+    #4e00c2 0%, #8e2de2 50%, #4e00c2 100%);
+    -fx-padding: 5 10;
+}
+
+/* Botones de ventana */
+.window-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-min-width: 24px;
+    -fx-min-height: 24px;
+}
+.window-button:hover {
+    -fx-background-color: rgba(255,255,255,0.2);
+}
+.window-close:hover {
+    -fx-background-color: #e81123;
+    -fx-text-fill: white;
+}
+
+
 
 /* Círculo de estado (el fill se controla desde el código) */
 .server-circle {
