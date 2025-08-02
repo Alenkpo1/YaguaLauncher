@@ -176,15 +176,23 @@ public class MainWindow extends Application {
         consoleTextArea = new TextArea();
         consoleTextArea.setEditable(false);
         consoleTextArea.getStyleClass().add("console-text-area");
+        // permitir que crezca al máximo
+        consoleTextArea.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        consoleTextArea.setStyle("-fx-font-family: monospace;");
         ScrollPane sp = new ScrollPane(consoleTextArea);
+        sp.getStyleClass().add("console-scroll-pane");
         sp.setFitToWidth(true);
         sp.setFitToHeight(true);
+        // permitir que crezca al máximo
+        sp.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(sp, Priority.ALWAYS);
 
         consolePane = new VBox(sp);
+        consolePane.getStyleClass().add("console-pane");
         consolePane.setPadding(new Insets(10));
-        consolePane.getStyleClass().add("section-pane");
+        // si lo metes en un VBox y quieres también que lo expanda:
+        consolePane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(consolePane, Priority.ALWAYS);
     }
 
     private void pingServer() {

@@ -162,6 +162,26 @@
     -fx-text-fill: rgba(154, 16, 144, 0.26);
 }
 
+/* fondo del VBox de consola (opcional si quieres margen violeta) */
+.console-pane {
+    -fx-background-color: #380193;
+}
+
+/* TextArea interno: fondo violeta oscuro, texto blanco */
+.console-text-area {
+    -fx-control-inner-background: #1c0134;
+    -fx-background-color: #1b0133;
+    -fx-text-fill: white;
+    -fx-font-family: monospace;
+}
+
+/* ScrollPane: quitar fondo por defecto y pintar la viewport */
+.console-scroll-pane {
+    -fx-background-color: transparent;
+}
+.console-scroll-pane > .viewport {
+    -fx-background-color: #1b0133;
+}
 
 
 /* Círculo de estado (el fill se controla desde el código) */
