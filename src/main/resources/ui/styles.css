@@ -2,8 +2,19 @@
 .root {
     -fx-background-color:
             linear-gradient(from 0% 0% to 100% 100%,
-            #4e00c2 0%, #0d0117 50%, #4e00c2 100%);
+            #4e00c2 0%, #000000 50%, #4e00c2 100%);
     -fx-font-family: "FSP DEMO - Cera Pro", sans-serif;
+    -fx-text-fill: white;
+}
+.label {
+    -fx-text-fill: white;
+}
+.section-header {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+.section-pane .label {
     -fx-text-fill: white;
 }
 
@@ -19,7 +30,9 @@
     -fx-background-color: transparent;
 }
 .nav-button:selected {
-    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-background-color: transparent;
+    -fx-border-color: #8e2de2;    /* color de acento */
+    -fx-border-width: 0 0 0 4;    /* línea de 4px a la izquierda */
 }
 
 .big-play-button {
@@ -31,6 +44,12 @@
     -fx-min-height: 60px;    /* alto mínimo */
     -fx-border-color: white;
     -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 10, 0, 0, 4);
+    -fx-transition: transform 0.2s;
+}
+.big-play-button:hover {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
 }
 
 /* Contenedores de sección */
@@ -64,7 +83,7 @@
 /* Inputs */
 .text-field, .combo-box {
     -fx-background-color: rgba(255,255,255,0.1);
-    -fx-border-color: rgba(255,255,255,0.6);
+    -fx-border-color: rgba(245, 240, 240, 0.6);
     -fx-border-width: 1;
     -fx-text-fill: white;
 }
@@ -76,10 +95,11 @@
 
 /* Contenedor del indicador de servidor */
 .server-status-box {
-    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-background-color: rgba(0, 0, 0, 0.4);
     -fx-border-color: rgba(255,255,255,0.3);
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 8, 0, 0, 2);
     -fx-border-width: 1;
-    -fx-padding: 5 10;
+    -fx-padding: 5 9;
     -fx-spacing: 8;
 }
 
@@ -94,28 +114,52 @@
     -fx-font-size: 12px;
 }
 
+.window-title {
+    -fx-text-fill: white !important;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
 
 /* Barra de título custom */
 .window-title-bar {
     -fx-background-color: linear-gradient(from 0% 0% to 100% 100%,
-    #4e00c2 0%, #8e2de2 50%, #4e00c2 100%);
+    #4e00c2 0%, #000000 50%, #4e00c2 100%);
     -fx-padding: 5 10;
 }
 
-/* Botones de ventana */
 .window-button {
     -fx-background-color: transparent;
+    -fx-border-color: rgba(255,255,255,0.6);
+    -fx-border-width: 1;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
     -fx-text-fill: white;
     -fx-font-size: 12px;
-    -fx-min-width: 24px;
+    -fx-min-width: 28px;
     -fx-min-height: 24px;
+    -fx-cursor: hand;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.3), 2, 0, 0, 1);
+    -fx-transition: background-color 150ms ease-in-out;
 }
+
+/* Hover suave */
 .window-button:hover {
     -fx-background-color: rgba(255,255,255,0.2);
 }
+
+/* Presionado */
+.window-button:pressed {
+    -fx-background-color: rgba(255,255,255,0.3);
+}
+
+/* Cerrar – color rojo vivo en hover */
+.window-close {
+    -fx-border-color: rgba(255, 255, 255, 0.73);
+}
+
 .window-close:hover {
-    -fx-background-color: #e81123;
-    -fx-text-fill: white;
+    -fx-background-color: rgba(232, 17, 35, 0);
+    -fx-text-fill: rgba(154, 16, 144, 0.26);
 }
 
 

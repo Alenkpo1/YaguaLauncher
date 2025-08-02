@@ -140,7 +140,7 @@ public class MainWindow extends Application {
         stage.setScene(loginScene);
         stage.setTitle("YaguaLauncher");
         stage.setWidth(854);
-        stage.setHeight(480);
+        stage.setHeight(500);
         stage.centerOnScreen();
         stage.setResizable(true);
         stage.show();
@@ -215,6 +215,9 @@ public class MainWindow extends Application {
             session = authManager.loginOffline(user);
             try { authManager.saveSession(session); } catch (IOException ex) { ex.printStackTrace(); }
             ((Stage) loginButton.getScene().getWindow()).setScene(mainScene);
+            stage.setWidth(854);
+            stage.setHeight(520);
+
             postLoginInit();
         });
 
@@ -229,11 +232,14 @@ public class MainWindow extends Application {
         StackPane.setAlignment(overlay, Pos.CENTER_LEFT);
         StackPane.setMargin(overlay, new Insets(0,0,0,50));
 
-        return new Scene(root, 1024, 576);
+        return new Scene(root, 1024, 520);
     }
 
     private double xOffset, yOffset;
     private Scene buildMainScene(Stage stage) {
+        // -> Quitar decoración nativa
+        stage.initStyle(StageStyle.UNDECORATED);
+
         // 1) Botones laterales
         navHome     = makeNavButton("/ui/icons/home.png");
         navProfiles = makeNavButton("/ui/icons/user.png");
@@ -246,17 +252,15 @@ public class MainWindow extends Application {
         }
         navHome.setSelected(true);
 
-        // Marco lateral (nav-bar)
         VBox navBar = new VBox(20, navHome, navProfiles, navVersions, navLaunch);
         navBar.setPadding(new Insets(20));
         navBar.getStyleClass().add("nav-bar");
 
-        // 2) Paneles de cada sección
-        buildHomePane();      // donde está tu botón JUGAR
+        // 2) Contenido central
+        buildHomePane();
         buildProfilesPane();
         buildVersionsPane();
         buildLaunchPane();
-
         StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane);
         showOnly(homePane);
         navHome    .setOnAction(e -> showOnly(homePane));
@@ -264,51 +268,7 @@ public class MainWindow extends Application {
         navVersions.setOnAction(e -> showOnly(versionsPane));
         navLaunch  .setOnAction(e -> showOnly(launchPane));
 
-        // 3) Construcción del BorderPane principal
-        BorderPane root = new BorderPane();
-        root.getStyleClass().add("root");
-        root.setLeft(navBar);
-        navBar.prefHeightProperty().bind(root.heightProperty());
-        root.setCenter(content);
-
-        // ==== Barra de título custom ====
-        Label titleLabel = new Label("YaguaLauncher");
-        titleLabel.setTextFill(Color.WHITE);
-        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-
-        Button btnMin = new Button("-");
-        btnMin.getStyleClass().add("window-button");
-        btnMin.setOnAction(e -> stage.setIconified(true));
-
-        Button btnMax = new Button("▢");
-        btnMax.getStyleClass().add("window-button");
-        btnMax.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
-
-        Button btnClose = new Button("×");
-        btnClose.getStyleClass().addAll("window-button", "window-close");
-        btnClose.setOnAction(e -> stage.close());
-
-        HBox windowControls = new HBox(5, btnMin, btnMax, btnClose);
-        windowControls.setAlignment(Pos.CENTER_RIGHT);
-
-        Region dragSpacer = new Region();
-        HBox.setHgrow(dragSpacer, Priority.ALWAYS);
-
-        HBox titleBar = new HBox(10, titleLabel, dragSpacer, windowControls);
-        titleBar.setPadding(new Insets(5, 10, 5, 10));
-        titleBar.getStyleClass().add("window-title-bar");
-        titleBar.setOnMousePressed(ev -> {
-            xOffset = ev.getSceneX();
-            yOffset = ev.getSceneY();
-        });
-        titleBar.setOnMouseDragged(ev -> {
-            if (!stage.isMaximized()) {
-                stage.setX(ev.getScreenX() - xOffset);
-                stage.setY(ev.getScreenY() - yOffset);
-            }
-        });
-
-        // ==== Indicador de servidor ====
+        // 3) Indicador de servidor arriba, dentro del layout principal
         serverLabel = new Label(SERVER_NAME);
         serverLabel.getStyleClass().add("server-name");
         serverLabel.setCursor(Cursor.DEFAULT);
@@ -324,26 +284,72 @@ public class MainWindow extends Application {
 
         HBox serverBox = new HBox(5, serverStatusCircle, serverLabel, pingLabel);
         serverBox.getStyleClass().add("server-status-box");
-        serverBox.setAlignment(Pos.CENTER);
+        serverBox.setAlignment(Pos.CENTER_RIGHT);
+        serverBox.setPadding(new Insets(5, 15, 5, 15));
 
-        // ==== Encabezado combinado ====
-        Region headerSpacer = new Region();
-        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        HBox header = new HBox(titleBar, headerSpacer, serverBox);
-        header.setAlignment(Pos.CENTER_LEFT);
+        // 4) Layout principal con BorderPane
+        BorderPane mainPane = new BorderPane();
+        mainPane.getStyleClass().add("content-pane");
+        mainPane.setLeft(navBar);
+        navBar.prefHeightProperty().bind(mainPane.heightProperty());
+        mainPane.setCenter(content);
+        mainPane.setTop(serverBox);
 
-        root.setTop(header);
+        // 5) Barra de título custom (flotando encima)
+        Label titleLabel = new Label("YaguaLauncher");
+        titleLabel.getStyleClass().add("window-title");
 
-        // 4) Crear scena y aplicar CSS
-        Scene scene = new Scene(root, 854, 480);
-        scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
+        Button btnMin = new Button("–");
+        btnMin.getStyleClass().add("window-button");
+        btnMin.setOnAction(e -> stage.setIconified(true));
 
-        // 5) Iniciar ping periódico
+        Button btnMax = new Button("▢");
+        btnMax.getStyleClass().add("window-button");
+        btnMax.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
+
+        Button btnClose = new Button("✕");
+        btnClose.getStyleClass().addAll("window-button", "window-close");
+        btnClose.setOnAction(e -> stage.close());
+
+        HBox windowControls = new HBox(5, btnMin, btnMax, btnClose);
+        windowControls.setAlignment(Pos.CENTER_RIGHT);
+
+        Region dragSpacer = new Region();
+        HBox.setHgrow(dragSpacer, Priority.ALWAYS);
+
+        HBox titleBar = new HBox(15, titleLabel, dragSpacer, windowControls);
+        titleBar.getStyleClass().add("window-title-bar");
+        titleBar.setPadding(new Insets(5, 10, 5, 10));
+        // Arrastrar ventana por el titleBar
+        titleBar.setOnMousePressed(ev -> {
+            xOffset = ev.getSceneX();
+            yOffset = ev.getSceneY();
+        });
+        titleBar.setOnMouseDragged(ev -> {
+            if (!stage.isMaximized()) {
+                stage.setX(ev.getScreenX() - xOffset);
+                stage.setY(ev.getScreenY() - yOffset);
+            }
+        });
+
+        // 6) Contenedor raíz: VBox con titleBar arriba y mainPane abajo
+        VBox root = new VBox(titleBar, mainPane);
+        root.getStyleClass().add("root");
+        VBox.setVgrow(mainPane, Priority.ALWAYS);
+
+        // 7) Escena y CSS
+        Scene scene = new Scene(root, 1024, 520);
+        String cssPath = Paths.get("src/main/resources/ui/styles.css").toUri().toString();
+        scene.getStylesheets().add(cssPath);
+
+        startCssWatcher(Paths.get("src/main/resources/ui/styles.css"), scene);
+
+        // 8) Ping periódico cada 5s
         Timeline pingTimer = new Timeline(
                 new KeyFrame(Duration.ZERO,    e -> pingServer()),
                 new KeyFrame(Duration.seconds(5))
         );
-        pingTimer.setCycleCount(Animation.INDEFINITE);
+        pingTimer.setCycleCount(Timeline.INDEFINITE);
         pingTimer.play();
 
         return scene;
