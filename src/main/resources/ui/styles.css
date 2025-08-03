@@ -234,3 +234,90 @@
 .server-circle {
     /* podrías colocar un color por defecto transparente aquí */
 }
+
+/* Hacer blancas las etiquetas de los CheckBox */
+.check-box {
+    -fx-text-fill: white;
+}
+
+/* Checkbox “Mostrar snapshots” */
+
+.check-box .text {
+    -fx-fill: white;
+}
+
+/* ComboBox: texto principal (selected item) */
+.combo-box {
+    -fx-text-fill: white;
+}
+
+/* ComboBox: fondo y borde (opcional para que combine) */
+.combo-box {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-border-color: rgba(255,255,255,0.6);
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.combo-box .list-view {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-border-color: rgba(255,255,255,0.6);
+    -fx-border-width: 1;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+}
+
+/* Items dentro del dropdown del ComboBox */
+.combo-box .list-cell {
+    -fx-text-fill: white;
+    -fx-background-color: transparent;
+}
+.combo-box .list-cell:hover,
+.combo-box .list-cell:selected {
+    -fx-background-color: rgba(255,255,255,0.2);
+}
+
+/* (Opcional) el prompt text también en blanco */
+.combo-box .text-field {
+    -fx-prompt-text-fill: rgba(255,255,255,0.7);
+}
+
+/* Aplica igual a todos los labels dentro de perfiles/versiones si quieres */
+.section-pane .label,
+.section-row .label {
+    -fx-text-fill: white;
+}
+
+/* Preview grande con borde suave */
+.screenshot-preview {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 8, 0, 0, 2);
+    -fx-background-color: #1e0030;
+}
+
+/* Columna de miniaturas */
+.screenshot-thumbs-column {
+    -fx-background-color: rgba(0,0,0,0.2);
+    -fx-padding: 10;
+    -fx-background-radius: 8px;
+}
+
+/* Cada Thumbnail */
+.screenshot-thumb {
+    -fx-border-color: rgba(255,255,255,0.3);
+    -fx-border-width: 1;
+    -fx-border-radius: 4px;
+}
+.screenshot-thumb:hover {
+    -fx-border-color: #8e2de2;
+    -fx-border-width: 2;
+}
+
+/* Sección de screenshots */
+.section-pane {
+    -fx-background-color: rgba(255,255,255,0.05);
+    -fx-border-color: rgba(255,255,255,0.3);
+    -fx-border-width: 1;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+}
+

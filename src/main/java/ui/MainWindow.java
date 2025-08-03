@@ -15,6 +15,8 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -47,6 +49,7 @@ import javafx.application.Platform;
 import javafx.util.Duration;
 
 import java.awt.*;
+import java.io.File;
 import java.net.*;
 
 import java.io.IOException;
@@ -90,10 +93,12 @@ public class MainWindow extends Application {
     // — Navegación lateral
     private ToggleButton navHome, navProfiles, navVersions, navLaunch;
     private ToggleButton navConsole;
+    private ToggleButton navScreenshots;
 
     // — Panes de contenido
     private VBox homePane, profilesPane, versionsPane, launchPane;
     private VBox consolePane;
+    private VBox           screenshotsPane;
     private Button bigPlay;
 
 
@@ -285,14 +290,15 @@ public class MainWindow extends Application {
         navVersions = makeNavButton("/ui/icons/versions.png");
         navLaunch   = makeNavButton("/ui/icons/play.png");
         navConsole  = makeNavButton("/ui/icons/console.png");
+        navScreenshots = makeNavButton("/ui/icons/screenshots.png");
         ToggleGroup navGroup = new ToggleGroup();
-        for (var tb : List.of(navHome, navProfiles, navVersions, navLaunch, navConsole)) {
+        for (var tb : List.of(navHome, navProfiles, navVersions, navLaunch, navConsole, navScreenshots)) {
             tb.setToggleGroup(navGroup);
             tb.getStyleClass().add("nav-button");
         }
         navHome.setSelected(true);
 
-        VBox navBar = new VBox(20, navHome, navProfiles, navVersions, navLaunch, navConsole);
+        VBox navBar = new VBox(20, navHome, navProfiles, navVersions, navLaunch, navConsole, navScreenshots);
         navBar.setPadding(new Insets(20));
         navBar.getStyleClass().add("nav-bar");
 
@@ -302,13 +308,16 @@ public class MainWindow extends Application {
         buildVersionsPane();
         buildLaunchPane();
         buildConsolePane();
-        StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane, consolePane);
+        buildScreenshotsPane();
+        StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane, consolePane, screenshotsPane);
         showOnly(homePane);
         navHome    .setOnAction(e -> showOnly(homePane));
         navProfiles.setOnAction(e -> showOnly(profilesPane));
         navVersions.setOnAction(e -> showOnly(versionsPane));
         navLaunch  .setOnAction(e -> showOnly(launchPane));
         navConsole .setOnAction(e -> showOnly(consolePane));
+        navScreenshots.setOnAction(e -> showOnly(screenshotsPane));
+
 
         // 3) Indicador de servidor arriba, dentro del layout principal
         serverLabel = new Label(SERVER_NAME);
@@ -448,6 +457,7 @@ public class MainWindow extends Application {
         versionsPane.setVisible(false);
         launchPane.setVisible(false);
         consolePane.setVisible(false);
+        screenshotsPane.setVisible(false);
         pane.setVisible(true);
     }
 
@@ -812,6 +822,98 @@ public class MainWindow extends Application {
             }
         }, "Launcher-Thread").start();
     }
+
+
+    private void buildScreenshotsPane() {
+        // 1) Directorio de capturas
+        Path ssDir = mcBaseDir.resolve("screenshots");
+        File folder = ssDir.toFile();
+        if (!folder.exists()) folder.mkdirs();
+
+        // 2) Preview grande
+        ImageView preview = new ImageView();
+        preview.setPreserveRatio(true);
+        preview.setFitWidth(600);
+        preview.setFitHeight(400);
+        preview.getStyleClass().add("screenshot-preview");
+        // para almacenar la ruta de la imagen actual
+        final ObjectProperty<Path> current = new SimpleObjectProperty<>();
+
+        // Al hacer doble‐click, abrimos con el visualizador de Windows
+        preview.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2 && current.get() != null) {
+                try {
+                    Desktop.getDesktop().open(current.get().toFile());
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        // 3) Miniaturas en columna
+        VBox thumbsColumn = new VBox(10);
+        thumbsColumn.setPadding(new Insets(10));
+        thumbsColumn.getStyleClass().add("screenshot-thumbs-column");
+
+        // Listamos solo PNG/JPG
+        File[] files = folder.listFiles((d, name) -> {
+            String ln = name.toLowerCase();
+            return ln.endsWith(".png") || ln.endsWith(".jpg") || ln.endsWith(".jpeg");
+        });
+
+        if (files == null || files.length == 0) {
+            Label none = new Label("No se encontraron screenshots");
+            none.getStyleClass().add("section-status");
+            thumbsColumn.getChildren().add(none);
+        } else {
+            // preview inicial
+            current.set(files[0].toPath());
+            preview.setImage(new Image(files[0].toURI().toString(), 600, 0, true, true));
+
+            for (File imgFile : files) {
+                Image thumbImg = new Image(imgFile.toURI().toString(), 100, 0, true, true);
+                ImageView thumb = new ImageView(thumbImg);
+                thumb.setPreserveRatio(true);
+                thumb.setFitWidth(100);
+                thumb.getStyleClass().add("screenshot-thumb");
+                thumb.setCursor(Cursor.HAND);
+                // al click simple cambiamos preview y ruta actual
+                thumb.setOnMouseClicked(e -> {
+                    current.set(imgFile.toPath());
+                    preview.setImage(new Image(imgFile.toURI().toString(), 600, 0, true, true));
+                });
+                thumbsColumn.getChildren().add(thumb);
+            }
+        }
+
+        // 4) Scroll para la columna de miniaturas
+        ScrollPane scrollThumbs = new ScrollPane(thumbsColumn);
+        scrollThumbs.setFitToWidth(true);
+        scrollThumbs.setPrefWidth(130);
+        scrollThumbs.setStyle("-fx-background: transparent;");
+        VBox.setVgrow(scrollThumbs, Priority.ALWAYS);
+
+        // 5) Header
+        Label header = new Label("Screenshots");
+        header.getStyleClass().add("section-header");
+
+        // 6) HBox principal: preview | thumbs
+        HBox hbox = new HBox(15, preview, scrollThumbs);
+        hbox.setAlignment(Pos.CENTER);
+        HBox.setHgrow(preview, Priority.ALWAYS);
+
+        // 7) Montaje final
+        VBox container = new VBox(10, header, hbox);
+        container.setPadding(new Insets(20));
+        container.getStyleClass().add("section-pane");
+        container.setVisible(false);
+        VBox.setVgrow(container, Priority.ALWAYS);
+
+        screenshotsPane = container;
+    }
+
+
+
 
 
     private String pathFromUrl(String url) throws URISyntaxException {
