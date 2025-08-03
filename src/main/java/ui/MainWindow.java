@@ -94,6 +94,7 @@ public class MainWindow extends Application {
     // — Panes de contenido
     private VBox homePane, profilesPane, versionsPane, launchPane;
     private VBox consolePane;
+    private Button bigPlay;
 
 
     // — Controles sección Perfiles
@@ -451,7 +452,7 @@ public class MainWindow extends Application {
             iv.setFitWidth(600);
         }
 
-        Button bigPlay = new Button("JUGAR");
+        bigPlay = new Button("JUGAR");
         bigPlay.getStyleClass().add("big-play-button");
         bigPlay.setOnAction(e -> {
             String ver = versionCombo.getValue();
@@ -461,6 +462,7 @@ public class MainWindow extends Application {
                         .showAndWait();
                 return;
             }
+            disablePlayButtons();
             launchGame();
         });
 
@@ -516,7 +518,7 @@ public class MainWindow extends Application {
     }
 
     private void buildLaunchPane() {
-        Label h = new Label("Lanzamiento");
+        Label h = new Label("Seleccionar RAM y lanzar el juego");
         h.getStyleClass().add("section-header");
         ramField     = new TextField("1024");
         ramField.setPrefWidth(100);
@@ -528,7 +530,26 @@ public class MainWindow extends Application {
         launchPane.setPadding(new Insets(20));
         launchPane.getStyleClass().add("section-pane");
 
-        launchButton.setOnAction(e->launchGame());
+        launchButton.setOnAction(e->{
+            disablePlayButtons();
+            launchGame();
+        });
+    }
+
+    private void disablePlayButtons() {
+        bigPlay    .setText("Jugando…");
+        bigPlay    .setDisable(true);
+
+        launchButton.setText("Jugando…");
+        launchButton.setDisable(true);
+    }
+
+    private void enablePlayButtons() {
+        bigPlay    .setText("JUGAR");
+        bigPlay    .setDisable(false);
+
+        launchButton.setText("Lanzar Minecraft");
+        launchButton.setDisable(false);
     }
 
     private Node createPlaceholder(int w, int h) {
@@ -743,38 +764,46 @@ public class MainWindow extends Application {
     }
 
 
-    private void launchGame() {
+    private void launchGame(){
         String ver = versionCombo.getValue();
-        if (ver == null) {
+        if(ver==null){
             statusLabel.setText("Selecciona una versión primero.");
             return;
         }
         int ram;
         try { ram = Integer.parseInt(ramField.getText().trim()); }
-        catch (NumberFormatException ex) {
+        catch(NumberFormatException ex){
             statusLabel.setText("RAM inválida.");
+            enablePlayButtons();
             return;
         }
 
-        // Limpio la consola antes de ejecutar
-        consoleTextArea.clear();
-        statusLabel.setText("Lanzando…");
-
         new Thread(() -> {
+            Platform.runLater(() -> statusLabel.setText("Lanzando…"));
             try {
+                // Llama a la versión que vuelca logs a consola (si la usas)
                 launchExecutor.launch(
-                        session, ver, mcBaseDir.toFile(), ram,
-                        null, 0,  // sin auto-connect en este ejemplo
+                        session,
+                        ver,
+                        mcBaseDir.toFile(),
+                        ram,
+                        null, 0,
                         line -> Platform.runLater(() -> consoleTextArea.appendText(line + "\n")),
                         err  -> Platform.runLater(() -> consoleTextArea.appendText("[ERR] " + err + "\n"))
                 );
-                Platform.runLater(() -> statusLabel.setText("¡Juego cerrado!"));
-            } catch (Exception ex) {
+            } catch(Exception ex){
                 ex.printStackTrace();
                 Platform.runLater(() -> statusLabel.setText("Error al lanzar"));
+            } finally {
+                // Rehabilitamos los botones cuando el proceso termine (o falle)
+                Platform.runLater(() -> {
+                    statusLabel.setText("¡Juego cerrado!");
+                    enablePlayButtons();
+                });
             }
-        }, "Launcher-Process").start();
+        }, "Launcher-Thread").start();
     }
+
 
     private String pathFromUrl(String url) throws URISyntaxException {
         URI uri = new URI(url);
