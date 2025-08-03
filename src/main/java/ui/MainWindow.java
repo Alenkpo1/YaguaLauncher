@@ -49,15 +49,15 @@ import javafx.application.Platform;
 import javafx.util.Duration;
 
 import java.awt.*;
-import java.io.File;
+import java.io.*;
 import java.net.*;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 
@@ -85,10 +85,19 @@ public class MainWindow extends Application {
     // — Escenas
     private Scene loginScene, mainScene;
 
+    private VBox                   thumbsColumn;
+    private ImageView              preview;
+    private ObjectProperty<Path>   current;
+
     // — Login UI
     private TextField usernameField;
     private Button    loginButton;
     private Label     loginStatusLabel;
+
+    private WatchService           screenshotWatcher;
+    private Thread                 screenshotWatcherThread;
+
+    private VBox                   screenshotsPane;
 
     // — Navegación lateral
     private ToggleButton navHome, navProfiles, navVersions, navLaunch;
@@ -98,9 +107,10 @@ public class MainWindow extends Application {
     // — Panes de contenido
     private VBox homePane, profilesPane, versionsPane, launchPane;
     private VBox consolePane;
-    private VBox           screenshotsPane;
+
     private Button bigPlay;
 
+    private final Set<Path> currentScreenshots = new HashSet<>();
 
     // — Controles sección Perfiles
     private ComboBox<String> profileCombo;
@@ -121,6 +131,8 @@ public class MainWindow extends Application {
     private Label  serverLabel;
     private Label  pingLabel;
 
+    private Button openDirButton;
+    private Button updateButton;
 
     public static void main(String[] args) {
         launch();
@@ -539,21 +551,71 @@ public class MainWindow extends Application {
     private void buildLaunchPane() {
         Label h = new Label("Seleccionar RAM y lanzar el juego");
         h.getStyleClass().add("section-header");
-        ramField     = new TextField("1024");
-        ramField.setPrefWidth(100);
-        launchButton = new Button("Lanzar Minecraft");
-        HBox row = new HBox(8, new Label("RAM (MB):"), ramField, launchButton);
-        row.getStyleClass().add("section-row");
 
-        launchPane = new VBox(12, h, row);
+        Label ramLabel = new Label("RAM (MB):");
+        ramLabel.getStyleClass().add("section-label");
+
+        ramField = new TextField("1024");
+        ramField.setPrefWidth(100);
+        ramField.getStyleClass().add("text-field");
+
+        launchButton = new Button("Lanzar Minecraft");
+        launchButton.getStyleClass().add("launch-button");
+
+        HBox row = new HBox(8, ramLabel, ramField, launchButton);
+        row.getStyleClass().add("section-row");
+        row.setAlignment(Pos.CENTER_LEFT);
+
+        // Botón abrir carpeta .minecraft
+        openDirButton = new Button("Abrir carpeta de juego");
+        openDirButton.getStyleClass().add("open-dir-button");
+        openDirButton.setOnAction(e -> {
+            try {
+                Desktop.getDesktop().open(mcBaseDir.toFile());
+            } catch (IOException ex) {
+                ex.printStackTrace();
+                new Alert(Alert.AlertType.ERROR,
+                        "No pude abrir la carpeta:\n" + ex.getMessage()).showAndWait();
+            }
+        });
+
+        // Botón comprobar actualizaciones
+        updateButton = new Button("Comprobar actualizaciones");
+        updateButton.getStyleClass().add("update-button");
+        updateButton.setOnAction(e -> checkForUpdates());
+
+        // spacer vertical para llevar botones abajo
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        // fila inferior: botón izq y botón der
+        Region bottomSpacer = new Region();
+        HBox.setHgrow(bottomSpacer, Priority.ALWAYS);
+
+        HBox bottomRow = new HBox(10,
+                openDirButton,
+                bottomSpacer,
+                updateButton
+        );
+        bottomRow.getStyleClass().add("section-row");
+        bottomRow.setAlignment(Pos.CENTER_LEFT);
+
+        // montamos todo
+        launchPane = new VBox(12,
+                h,
+                row,
+                spacer,
+                bottomRow
+        );
         launchPane.setPadding(new Insets(20));
         launchPane.getStyleClass().add("section-pane");
 
-        launchButton.setOnAction(e->{
+        launchButton.setOnAction(e -> {
             disablePlayButtons();
             launchGame();
         });
     }
+
 
     private void disablePlayButtons() {
         bigPlay    .setText("Jugando…");
@@ -825,96 +887,228 @@ public class MainWindow extends Application {
 
 
     private void buildScreenshotsPane() {
-        // 1) Directorio de capturas
         Path ssDir = mcBaseDir.resolve("screenshots");
         File folder = ssDir.toFile();
         if (!folder.exists()) folder.mkdirs();
 
-        // 2) Preview grande
-        ImageView preview = new ImageView();
+        // Preview
+        preview = new ImageView();
         preview.setPreserveRatio(true);
         preview.setFitWidth(600);
         preview.setFitHeight(400);
         preview.getStyleClass().add("screenshot-preview");
-        // para almacenar la ruta de la imagen actual
-        final ObjectProperty<Path> current = new SimpleObjectProperty<>();
 
-        // Al hacer doble‐click, abrimos con el visualizador de Windows
+        current = new SimpleObjectProperty<>();
+
+        // Doble-click abre en Windows
         preview.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && current.get() != null) {
-                try {
-                    Desktop.getDesktop().open(current.get().toFile());
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                try { Desktop.getDesktop().open(current.get().toFile()); }
+                catch (IOException ex) { ex.printStackTrace(); }
             }
         });
 
-        // 3) Miniaturas en columna
-        VBox thumbsColumn = new VBox(10);
+        // Columnita de thumbs
+        thumbsColumn = new VBox(10);
         thumbsColumn.setPadding(new Insets(10));
         thumbsColumn.getStyleClass().add("screenshot-thumbs-column");
 
-        // Listamos solo PNG/JPG
-        File[] files = folder.listFiles((d, name) -> {
-            String ln = name.toLowerCase();
-            return ln.endsWith(".png") || ln.endsWith(".jpg") || ln.endsWith(".jpeg");
-        });
+        thumbsColumn.setStyle(null);
+        // Carga inicial
+        refreshScreenshotsOnce(folder.toPath());
 
-        if (files == null || files.length == 0) {
-            Label none = new Label("No se encontraron screenshots");
-            none.getStyleClass().add("section-status");
-            thumbsColumn.getChildren().add(none);
-        } else {
-            // preview inicial
-            current.set(files[0].toPath());
-            preview.setImage(new Image(files[0].toURI().toString(), 600, 0, true, true));
-
-            for (File imgFile : files) {
-                Image thumbImg = new Image(imgFile.toURI().toString(), 100, 0, true, true);
-                ImageView thumb = new ImageView(thumbImg);
-                thumb.setPreserveRatio(true);
-                thumb.setFitWidth(100);
-                thumb.getStyleClass().add("screenshot-thumb");
-                thumb.setCursor(Cursor.HAND);
-                // al click simple cambiamos preview y ruta actual
-                thumb.setOnMouseClicked(e -> {
-                    current.set(imgFile.toPath());
-                    preview.setImage(new Image(imgFile.toURI().toString(), 600, 0, true, true));
-                });
-                thumbsColumn.getChildren().add(thumb);
-            }
-        }
-
-        // 4) Scroll para la columna de miniaturas
         ScrollPane scrollThumbs = new ScrollPane(thumbsColumn);
         scrollThumbs.setFitToWidth(true);
         scrollThumbs.setPrefWidth(130);
         scrollThumbs.setStyle("-fx-background: transparent;");
         VBox.setVgrow(scrollThumbs, Priority.ALWAYS);
 
-        // 5) Header
         Label header = new Label("Screenshots");
         header.getStyleClass().add("section-header");
 
-        // 6) HBox principal: preview | thumbs
         HBox hbox = new HBox(15, preview, scrollThumbs);
         hbox.setAlignment(Pos.CENTER);
         HBox.setHgrow(preview, Priority.ALWAYS);
 
-        // 7) Montaje final
-        VBox container = new VBox(10, header, hbox);
-        container.setPadding(new Insets(20));
-        container.getStyleClass().add("section-pane");
-        container.setVisible(false);
-        VBox.setVgrow(container, Priority.ALWAYS);
+        screenshotsPane = new VBox(10, header, hbox);
+        screenshotsPane.setPadding(new Insets(20));
+        screenshotsPane.getStyleClass().add("section-pane");
+        screenshotsPane.setVisible(false);
+        VBox.setVgrow(screenshotsPane, Priority.ALWAYS);
 
-        screenshotsPane = container;
+        // Arranca el timer que refresca cada 5s
+        startScreenshotsTimer(folder.toPath());
     }
 
 
 
+    private void refreshScreenshotsOnce(Path ssDir) {
+        File[] files = ssDir.toFile().listFiles((d,n)->{
+            String ln = n.toLowerCase();
+            return ln.endsWith(".png")||ln.endsWith(".jpg")||ln.endsWith(".jpeg");
+        });
+        currentScreenshots.clear();
+        thumbsColumn.getChildren().clear();
 
+        if (files == null || files.length == 0) {
+            Label none = new Label("No se encontraron screenshots");
+            none.getStyleClass().add("section-status");
+            thumbsColumn.getChildren().add(none);
+        } else {
+            // Previsualizamos la primera
+            currentScreenshots.clear();
+            for (File f : files) currentScreenshots.add(f.toPath());
+            Path first = files[0].toPath();
+            current.set(first);
+            preview.setImage(new Image(first.toUri().toString(), 600,0,true,true));
+
+            // Miniaturas
+            for (Path p : currentScreenshots) {
+                addScreenshotThumbnail(p);
+            }
+        }
+    }
+
+    private void refreshScreenshots(Path ssDir) {
+        // Listado actual en disco
+        Set<Path> found = new HashSet<>();
+        File[] files = ssDir.toFile().listFiles((d,n)->{
+            String ln = n.toLowerCase();
+            return ln.endsWith(".png")||ln.endsWith(".jpg");
+        });
+        if (files != null) for (File f : files) found.add(f.toPath());
+
+        // 1) Nuevos
+        for (Path p : found) {
+            if (!currentScreenshots.contains(p)) {
+                currentScreenshots.add(p);
+                addScreenshotThumbnail(p);
+            }
+        }
+        // 2) Borrados
+        Iterator<Path> it = currentScreenshots.iterator();
+        while (it.hasNext()) {
+            Path p = it.next();
+            if (!found.contains(p)) {
+                removeScreenshotThumbnail(p);
+                it.remove();
+            }
+        }
+    }
+
+    private void startScreenshotsTimer(Path ssDir) {
+        Timeline timer = new Timeline(
+                new KeyFrame(Duration.ZERO, e -> refreshScreenshots(ssDir)),
+                new KeyFrame(Duration.seconds(5))
+        );
+        timer.setCycleCount(Timeline.INDEFINITE);
+        timer.play();
+    }
+
+
+    private void startScreenshotWatcher() {
+        try {
+            Path dir = mcBaseDir.resolve("screenshots");
+            screenshotWatcher = FileSystems.getDefault().newWatchService();
+            dir.register(screenshotWatcher, StandardWatchEventKinds.ENTRY_CREATE,
+                    StandardWatchEventKinds.ENTRY_DELETE);
+
+            // Lanzamos un hilo demonio que vigile la carpeta
+            screenshotWatcherThread = new Thread(() -> {
+                try {
+                    while (true) {
+                        WatchKey key = screenshotWatcher.take();
+                        for (WatchEvent<?> ev : key.pollEvents()) {
+                            WatchEvent.Kind<?> kind = ev.kind();
+                            Path filename = ((WatchEvent<Path>)ev).context();
+                            Path fullPath = dir.resolve(filename);
+
+                            // Solo png/jpg
+                            String ln = filename.toString().toLowerCase();
+                            if (!(ln.endsWith(".png")||ln.endsWith(".jpg"))) continue;
+
+                            Platform.runLater(() -> {
+                                if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    addScreenshotThumbnail(fullPath);
+                                } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
+                                    removeScreenshotThumbnail(fullPath);
+                                }
+                            });
+                        }
+                        if (!key.reset()) break;
+                    }
+                } catch (InterruptedException ignored) {}
+            }, "Screenshots-Watcher");
+            screenshotWatcherThread.setDaemon(true);
+            screenshotWatcherThread.start();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void addScreenshotThumbnail(Path imgPath) {
+        try {
+            // 1) Cargar imagen en miniatura
+            Image thumbImg = new Image(
+                    imgPath.toUri().toString(),
+                    100,     // ancho
+                    0,       // auto-height
+                    true,    // preserve ratio
+                    true     // smooth
+            );
+
+            // 2) Crear ImageView
+            ImageView thumb = new ImageView(thumbImg);
+            thumb.setPreserveRatio(true);
+            thumb.setFitWidth(100);
+            thumb.getStyleClass().add("screenshot-thumb");
+
+            // 3) Envolver en un StackPane para poder pintar el fondo
+            StackPane thumbContainer = new StackPane(thumb);
+            thumbContainer.getStyleClass().add("screenshot-thumb-container");
+            thumbContainer.setPadding(new Insets(4));
+            thumbContainer.setCursor(Cursor.HAND);
+
+            // 4) Click handler: seleccionar y actualizar preview
+            thumbContainer.setOnMouseClicked(e -> {
+                // a) desmarcar cualquier otro seleccionado
+                thumbsColumn.getChildren().forEach(node ->
+                        node.getStyleClass().remove("selected-thumb")
+                );
+                // b) marcar este contenedor
+                thumbContainer.getStyleClass().add("selected-thumb");
+
+                // c) actualizar la ruta actual y la vista previa
+                current.set(imgPath);
+                preview.setImage(new Image(
+                        imgPath.toUri().toString(),
+                        600, 0, true, true
+                ));
+            });
+
+            // 5) Añadir al VBox de miniaturas
+            thumbsColumn.getChildren().add(thumbContainer);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+
+    // Llamado al borrar un archivo
+    private void removeScreenshotThumbnail(Path imgPath) {
+        thumbsColumn.getChildren().removeIf(node -> {
+            if (node instanceof ImageView iv) {
+                return iv.getImage().getUrl().equals(imgPath.toUri().toString());
+            }
+            return false;
+        });
+        // Si la que estamos viendo en preview fue borrada, limpia la vista:
+        if (current.get() != null && current.get().equals(imgPath)) {
+            current.set(null);
+            preview.setImage(null);
+        }
+    }
 
     private String pathFromUrl(String url) throws URISyntaxException {
         URI uri = new URI(url);
@@ -931,4 +1125,231 @@ public class MainWindow extends Application {
             return Paths.get(System.getProperty("user.home"),".minecraft");
         }
     }
+
+
+    private String getCurrentVersion() {
+        try (InputStream in = getClass().getResourceAsStream("/version.properties")) {
+            Properties props = new Properties();
+            props.load(in);
+            return props.getProperty("launcher.version", "0.0.0");
+        } catch (IOException e) {
+            e.printStackTrace();
+            return "0.0.0";
+        }
+    }
+
+
+    private String fetchLatestTagName() throws IOException {
+        URL url = new URL("https://api.github.com/repos/TU_USUARIO/YaguaLauncher/releases/latest");
+        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+        conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+        try (BufferedReader r = new BufferedReader(
+                new InputStreamReader(conn.getInputStream()))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line);
+            String json = sb.toString();
+            String key = "\"tag_name\":\"";
+            int i = json.indexOf(key);
+            if (i >= 0) {
+                int start = i + key.length();
+                int end = json.indexOf("\"", start);
+                if (end >= 0) {
+                    return json.substring(start, end);
+                }
+            }
+        }
+        throw new IOException("No pude obtener tag_name de la última release");
+    }
+
+    /** Compara semánticamente dos versiones X.Y.Z */
+    private boolean isNewer(String current, String latest) {
+        String[] a = current.replaceFirst("^v","").split("\\.");
+        String[] b = latest .replaceFirst("^v","").split("\\.");
+        for (int i = 0; i < Math.max(a.length, b.length); i++) {
+            int ai = i < a.length ? Integer.parseInt(a[i]) : 0;
+            int bi = i < b.length ? Integer.parseInt(b[i]) : 0;
+            if (bi > ai) return true;
+            if (bi < ai) return false;
+        }
+        return false;
+    }
+    private record ReleaseInfo(String tag, String assetUrl) {}
+
+
+    private ReleaseInfo fetchLatestReleaseInfo() throws IOException {
+        // 1) Conecta a GitHub API
+        URL apiUrl = new URL("https://api.github.com/repos/TU_USUARIO/YaguaLauncher/releases/latest");
+        HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
+        conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+        conn.setConnectTimeout(5000);
+        conn.setReadTimeout(5000);
+
+        int status = conn.getResponseCode();
+        if (status != 200) {
+            throw new IOException("GitHub API responded with HTTP " + status);
+        }
+
+        // 2) Lee todo el JSON en un StringBuilder
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(conn.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+        } finally {
+            conn.disconnect();
+        }
+        String json = sb.toString();
+
+        // 3) Extrae el campo "tag_name"
+        Pattern tagPattern = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+        Matcher tagMatcher = tagPattern.matcher(json);
+        if (!tagMatcher.find()) {
+            throw new IOException("No se encontró el campo tag_name en la respuesta de GitHub");
+        }
+        String tag = tagMatcher.group(1);
+
+        // 4) Extrae la primera "browser_download_url" (suele apuntar al JAR)
+        Pattern urlPattern = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.jar)\"");
+        Matcher urlMatcher = urlPattern.matcher(json);
+        if (!urlMatcher.find()) {
+            throw new IOException("No se encontró ningún asset .jar en la última release");
+        }
+        String assetUrl = urlMatcher.group(1);
+
+        return new ReleaseInfo(tag, assetUrl);
+    }
+
+
+    private void checkForUpdates() {
+        updateButton.setDisable(true);
+        Task<ReleaseInfo> t = new Task<>() {
+            @Override protected ReleaseInfo call() throws Exception {
+                String current = getCurrentVersion();
+                updateMessage("Buscando actualizaciones…");
+                ReleaseInfo info = fetchLatestReleaseInfo();
+                if (isNewer(current, info.tag())) return info;
+                else return new ReleaseInfo("", "");
+            }
+        };
+        t.setOnSucceeded(e -> {
+            updateButton.setDisable(false);
+            ReleaseInfo info = t.getValue();
+            if (!info.tag().isEmpty()) {
+                promptUpdate(info.tag(), info.assetUrl());
+            } else {
+                new Alert(Alert.AlertType.INFORMATION,
+                        "Ya tienes la última versión (" + getCurrentVersion() + ")"
+                ).showAndWait();
+            }
+        });
+        t.setOnFailed(e -> {
+            updateButton.setDisable(false);
+            new Alert(Alert.AlertType.ERROR,
+                    "Error al buscar actualizaciones:\n" + t.getException().getMessage()
+            ).showAndWait();
+        });
+        new Thread(t, "Check-Updates").start();
+    }
+
+    private void promptUpdate(String latestTag, String assetUrl) {
+        Alert dlg = new Alert(Alert.AlertType.CONFIRMATION,
+                "Hay una nueva versión: " + latestTag + "\n¿Descargar y reiniciar ahora?",
+                ButtonType.YES, ButtonType.NO
+        );
+        dlg.setTitle("Actualización disponible");
+        dlg.setHeaderText(null);
+        dlg.showAndWait().ifPresent(bt -> {
+            if (bt == ButtonType.YES) {
+                // Descarga en background
+                Task<Path> downloadTask = new Task<>() {
+                    @Override protected Path call() throws Exception {
+                        updateButton.setDisable(true);
+                        updateMessage("Descargando actualización…");
+                        return downloadNewVersion(assetUrl);
+                    }
+                };
+                downloadTask.setOnSucceeded(ev -> {
+                    try {
+                        scheduleReplaceAndRestart(downloadTask.getValue());
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                        new Alert(Alert.AlertType.ERROR,
+                                "Error al actualizar:\n" + ex.getMessage()
+                        ).showAndWait();
+                        updateButton.setDisable(false);
+                    }
+                });
+                downloadTask.setOnFailed(ev -> {
+                    new Alert(Alert.AlertType.ERROR,
+                            "Error al descargar actualización:\n"
+                                    + downloadTask.getException().getMessage()
+                    ).showAndWait();
+                    updateButton.setDisable(false);
+                });
+                new Thread(downloadTask, "Download-Update").start();
+            }
+        });
+    }
+
+
+
+
+
+
+    private Path downloadNewVersion(String assetUrl) throws IOException {
+        URL url = new URL(assetUrl);
+        Path tmp = Files.createTempFile("YaguaLauncher-update-", ".jar");
+        try (var in = url.openStream();
+             var out = Files.newOutputStream(tmp,
+                     StandardOpenOption.CREATE,
+                     StandardOpenOption.TRUNCATE_EXISTING)) {
+            in.transferTo(out);
+        }
+        return tmp;
+    }
+
+    /**
+     * Crea y ejecuta un .bat que:
+     *  - espera a que este proceso termine
+     *  - mueve el JAR descargado sobre el JAR actual
+     *  - relanza el launcher
+     */
+    private void scheduleReplaceAndRestart(Path newJar) throws Exception {
+        // 1) Obtén la ruta del JAR actualmente en ejecución
+        // (asume que el launcher está en un solo JAR ejecutable)
+        URI codeUri = getClass()
+                .getProtectionDomain()
+                .getCodeSource()
+                .getLocation()
+                .toURI();
+        Path currentJar = Paths.get(codeUri);
+
+        // 2) Crea el script .bat en un temp
+        Path script = Files.createTempFile("update-launcher-", ".bat");
+        String bat = String.join("\r\n",
+                "@echo off",
+                "echo Esperando a que YaguaLauncher termine…",
+                "ping 127.0.0.1 -n 3 >nul",            // pequeña espera (~2s)
+                "move /Y \"" + newJar.toString() + "\" \"" + currentJar.toString() + "\"",
+                "start \"\" \"" + currentJar.toString() + "\"",
+                "exit"
+        );
+        Files.writeString(script, bat, StandardOpenOption.TRUNCATE_EXISTING);
+
+        // 3) Ejecuta el .bat en segundo plano
+        new ProcessBuilder("cmd", "/C", "start", "\"\"", script.toString())
+                .inheritIO()
+                .start();
+
+        // 4) Cierra este launcher para que el .bat pueda mover el JAR
+        Platform.exit();
+    }
+
+
+
 }
+
+

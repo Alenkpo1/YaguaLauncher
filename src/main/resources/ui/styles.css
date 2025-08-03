@@ -296,7 +296,7 @@
 
 /* Columna de miniaturas */
 .screenshot-thumbs-column {
-    -fx-background-color: rgba(0,0,0,0.2);
+    -fx-background-color: transparent;
     -fx-padding: 10;
     -fx-background-radius: 8px;
 }
@@ -312,6 +312,25 @@
     -fx-border-width: 2;
 }
 
+/* Contenedor transparente por defecto */
+.screenshot-thumb-container {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6 px;
+}
+
+/* Fondo violeta ligero al estar “selected” */
+.screenshot-thumb-container.selected-thumb {
+    -fx-background-color: rgba(142, 45, 226, 0.4); /* #8e2de2 con transparencia */
+    -fx-background-radius: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(142,45,226,0.6), 8, 0, 0, 0);
+
+}
+
+/* Sombra o borde opcional para resaltar más */
+.screenshot-thumb-container.selected-thumb {
+    -fx-effect: dropshadow(gaussian, rgba(142,45,226,0.6), 8, 0, 0, 0);
+}
+
 /* Sección de screenshots */
 .section-pane {
     -fx-background-color: rgba(255,255,255,0.05);
@@ -321,3 +340,40 @@
     -fx-border-radius: 8px;
 }
 
+.open-dir-button {
+    -fx-background-color: transparent;
+    -fx-border-color: white;
+    -fx-border-width: 1px;
+
+    -fx-background-radius: 6px;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-padding: 8px 14px;
+    -fx-cursor: hand;
+    -fx-transition: background-color 150ms ease-in-out,
+    border-color 150ms ease-in-out;
+}
+
+.open-dir-button:hover {
+    -fx-background-color: rgba(255,255,255,0.15);
+    -fx-border-color: #8e2de2;
+}
+
+.update-button {
+    -fx-background-color: transparent;
+    -fx-border-color: white;
+    -fx-border-width: 1px;
+
+    -fx-background-radius: 6px;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-padding: 8px 14px;
+    -fx-cursor: hand;
+    -fx-transition: background-color 150ms ease-in-out,
+    border-color 150ms ease-in-out;
+}
+
+.update-button:hover {
+    -fx-background-color: rgba(255,255,255,0.15);
+    -fx-border-color: #8e2de2;
+}
