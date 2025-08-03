@@ -303,7 +303,7 @@
 
 /* Cada Thumbnail */
 .screenshot-thumb {
-    -fx-border-color: rgba(255,255,255,0.3);
+    -fx-border-color: rgb(27, 1, 51);
     -fx-border-width: 1;
     -fx-border-radius: 4px;
 }
