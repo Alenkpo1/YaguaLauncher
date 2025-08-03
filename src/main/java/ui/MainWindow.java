@@ -215,10 +215,14 @@ public class MainWindow extends Application {
         }, "Ping-Server").start();
     }
     private Scene buildLoginScene(Stage stage) {
-        usernameField    = new TextField();
-        usernameField.setPromptText("Usuario offline");
-        loginButton      = new Button("Login Offline");
+        usernameField = new TextField();
+        usernameField.setPromptText("Usuario");
+        usernameField.getStyleClass().add("login-field");
+
+        loginButton = new Button("Login");
+        loginButton.getStyleClass().add("login-button");
         loginStatusLabel = new Label();
+        loginStatusLabel.getStyleClass().add("login-status");
         loginStatusLabel.setStyle("-fx-text-fill: tomato;");
 
         VBox overlay = new VBox(15,
@@ -227,12 +231,9 @@ public class MainWindow extends Application {
                 loginButton,
                 loginStatusLabel
         );
+        overlay.getStyleClass().add("login-overlay");
         overlay.setPadding(new Insets(30));
-        overlay.setMaxWidth(300);
-        overlay.setStyle(
-                "-fx-background-color: rgba(0,0,0,0.6);" +
-                        "-fx-border-color: rgba(255,255,255,0.3); -fx-border-width:1;"
-        );
+        overlay.setMaxWidth(320);
         overlay.setAlignment(Pos.CENTER_LEFT);
 
         loginButton.setMaxWidth(Double.MAX_VALUE);
@@ -244,10 +245,11 @@ public class MainWindow extends Application {
             }
             session = authManager.loginOffline(user);
             try { authManager.saveSession(session); } catch (IOException ex) { ex.printStackTrace(); }
-            ((Stage) loginButton.getScene().getWindow()).setScene(mainScene);
-            stage.setWidth(854);
-            stage.setHeight(520);
-
+            Stage st = (Stage) loginButton.getScene().getWindow();
+            st.setScene(mainScene);
+            st.setWidth(854);
+            st.setHeight(520);
+            st.centerOnScreen();
             postLoginInit();
         });
 
@@ -256,14 +258,21 @@ public class MainWindow extends Application {
                 ? new ImageView(new Image(bgStream))
                 : new ImageView();
         bgView.setPreserveRatio(false);
+
         StackPane root = new StackPane(bgView, overlay);
         bgView.fitWidthProperty().bind(root.widthProperty());
         bgView.fitHeightProperty().bind(root.heightProperty());
         StackPane.setAlignment(overlay, Pos.CENTER_LEFT);
         StackPane.setMargin(overlay, new Insets(0,0,0,50));
 
-        return new Scene(root, 1024, 520);
+        Scene scene = new Scene(root, 1024, 520);
+        String cssPath = Paths.get("src/main/resources/ui/styles.css").toUri().toString();
+        scene.getStylesheets().add(cssPath);
+
+        startCssWatcher(Paths.get("src/main/resources/ui/styles.css"), scene);
+        return scene;
     }
+
 
     private double xOffset, yOffset;
     private Scene buildMainScene(Stage stage) {

@@ -18,6 +18,8 @@
     -fx-text-fill: white;
 }
 
+
+
 /* Barra lateral */
 .nav-bar {
     -fx-pref-width: 80px;                /* ancho fijo */
@@ -181,6 +183,50 @@
 }
 .console-scroll-pane > .viewport {
     -fx-background-color: #1b0133;
+}
+
+.login-overlay {
+    -fx-background-color: rgba(0, 0, 0, 0.6);
+
+    -fx-border-color: rgba(255,255,255,0.3);
+    -fx-border-width: 1px;
+
+}
+
+.login-field {
+    -fx-background-color: rgba(255,255,255,0.15);
+
+    -fx-border-color: rgba(255,255,255,0.6);
+    -fx-border-width: 1px;
+
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: rgba(255,255,255,0.7);
+    -fx-font-size: 14px;
+    -fx-padding: 8px 12px;
+}
+
+.login-button {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%,
+    #7625b9 0%, #3d0493 100%);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 20px;
+    -fx-cursor: hand;
+    -fx-transition: background-color 150ms ease-in-out;
+}
+
+.login-button:hover {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%,
+    #9b3ae8 0%, #5410d9 100%);
+}
+
+.login-status {
+    -fx-font-size: 12px;
+    -fx-text-fill: tomato;
 }
 
 
