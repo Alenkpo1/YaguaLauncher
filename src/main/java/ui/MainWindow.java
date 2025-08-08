@@ -162,9 +162,20 @@ public class MainWindow extends Application {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        // en tu clase MainWindow o en tu inicializador de UI
+        String fontPath = "/ui/fonts/Rubik-Bold.ttf"; // ruta en src/main/resources/fonts
+        InputStream fontStream = getClass().getResourceAsStream(fontPath);
+        if (fontStream == null) {
+            System.err.println("¡No hallo la fuente en: " + fontPath + "!");
+        } else {
+            Font loadedFont = Font.loadFont(fontStream, 12);
+            System.out.println("Cargada familia: " + loadedFont.getFamily());
+        }
+
         stage.initStyle(StageStyle.UNDECORATED);
 
-        var fontUrl = getClass().getResource("/ui/fonts/CeraPro-Regular.otf");
+        var fontUrl = getClass().getResource("/ui/fonts/Rubik-Bold.ttf");
         if (fontUrl != null) Font.loadFont(fontUrl.toExternalForm(), 12);
 
         // Inicializa managers
@@ -689,7 +700,7 @@ public class MainWindow extends Application {
     private Label createTitleLabel(String text) {
         Label lbl = new Label(text);
         lbl.setTextFill(javafx.scene.paint.Color.WHITE);
-        lbl.setFont(Font.font("FSP DEMO - Cera Pro",24));
+        lbl.setFont(Font.font("Roboto",24));
         return lbl;
     }
 
@@ -1258,7 +1269,7 @@ public class MainWindow extends Application {
         String tag = tagMatcher.group(1);
 
         // 4) Extrae la primera "browser_download_url" (suele apuntar al JAR)
-        Pattern urlPattern = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.jar)\"");
+        Pattern urlPattern = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.exe)\"");
         Matcher urlMatcher = urlPattern.matcher(json);
         if (!urlMatcher.find()) {
             throw new IOException("No se encontró ningún asset .jar en la última release");
@@ -1363,34 +1374,27 @@ public class MainWindow extends Application {
      *  - mueve el JAR descargado sobre el JAR actual
      *  - relanza el launcher
      */
-    private void scheduleReplaceAndRestart(Path newJar) throws Exception {
-        // 1) Obtén la ruta del JAR actualmente en ejecución
-        // (asume que el launcher está en un solo JAR ejecutable)
-        URI codeUri = getClass()
-                .getProtectionDomain()
-                .getCodeSource()
-                .getLocation()
-                .toURI();
-        Path currentJar = Paths.get(codeUri);
+    private void scheduleReplaceAndRestart(Path newExe) throws Exception {
+        Path currentExe = Paths.get(getExePath());
 
-        // 2) Crea el script .bat en un temp
+        // Crea un script .bat temporal para reemplazar el EXE
         Path script = Files.createTempFile("update-launcher-", ".bat");
         String bat = String.join("\r\n",
                 "@echo off",
-                "echo Esperando a que YaguaLauncher termine…",
-                "ping 127.0.0.1 -n 3 >nul",            // pequeña espera (~2s)
-                "move /Y \"" + newJar.toString() + "\" \"" + currentJar.toString() + "\"",
-                "start \"\" \"" + currentJar.toString() + "\"",
+                "echo Esperando que YaguaLauncher cierre…",
+                "ping 127.0.0.1 -n 3 >nul",
+                "move /Y \"" + newExe.toString() + "\" \"" + currentExe.toString() + "\"",
+                "start \"\" \"" + currentExe.toString() + "\"",
                 "exit"
         );
         Files.writeString(script, bat, StandardOpenOption.TRUNCATE_EXISTING);
 
-        // 3) Ejecuta el .bat en segundo plano
+        // Ejecuta el script
         new ProcessBuilder("cmd", "/C", "start", "\"\"", script.toString())
                 .inheritIO()
                 .start();
 
-        // 4) Cierra este launcher para que el .bat pueda mover el JAR
+        // Cierra este launcher
         Platform.exit();
     }
 
