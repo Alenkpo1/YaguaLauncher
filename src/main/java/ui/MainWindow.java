@@ -1,5 +1,6 @@
 package ui;
 
+import com.sun.jna.Native;
 import core.AuthManager;
 import core.AssetDownloader;
 import core.AssetsManager;
@@ -60,6 +61,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import com.sun.jna.platform.win32.Shell32;
+import com.sun.jna.platform.win32.ShellAPI;
+import com.sun.jna.platform.win32.WinDef;
+import com.sun.jna.platform.win32.ShlObj;
+import com.sun.jna.ptr.IntByReference;
+
+import java.io.File;
+import java.nio.file.Path;
 
 
 public class MainWindow extends Application {
@@ -139,8 +148,20 @@ public class MainWindow extends Application {
     }
 
     @Override
-    public void start(Stage stage) {
+    public void start(Stage stage) throws URISyntaxException {
         // Carga opcional de fuente
+        System.out.println("Path final del .exe: " + getExePath());
+        try {
+            Path iconoTemp = extraerRecursoComoArchivoTemporal("/ui/icon.ico", "icono");
+
+            ShortcutCreator.crearAccesoDirecto(
+                    "YaguaLauncher",
+                    Path.of(getExePath()),
+                    iconoTemp
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         stage.initStyle(StageStyle.UNDECORATED);
 
         var fontUrl = getClass().getResource("/ui/fonts/CeraPro-Regular.otf");
@@ -283,10 +304,7 @@ public class MainWindow extends Application {
         StackPane.setMargin(overlay, new Insets(0,0,0,50));
 
         Scene scene = new Scene(root, 1024, 520);
-        String cssPath = Paths.get("src/main/resources/ui/styles.css").toUri().toString();
-        scene.getStylesheets().add(cssPath);
-
-        startCssWatcher(Paths.get("src/main/resources/ui/styles.css"), scene);
+        scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
         return scene;
     }
 
@@ -402,10 +420,7 @@ public class MainWindow extends Application {
 
         // 7) Escena y CSS
         Scene scene = new Scene(root, 1024, 520);
-        String cssPath = Paths.get("src/main/resources/ui/styles.css").toUri().toString();
-        scene.getStylesheets().add(cssPath);
-
-        startCssWatcher(Paths.get("src/main/resources/ui/styles.css"), scene);
+        scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
 
         // 8) Ping periódico cada 5s
         Timeline pingTimer = new Timeline(
@@ -444,6 +459,37 @@ public class MainWindow extends Application {
         }, "CSS-Watcher");
         watcher.setDaemon(true);
         watcher.start();
+    }
+
+    private void crearAccesoDirectoEscritorio() {
+        String nombre = "YaguaLauncher";
+        String userHome = System.getProperty("user.home");
+        Path escritorio = Paths.get(userHome, "Desktop", nombre + ".lnk");
+
+        if (Files.exists(escritorio)) return; // ya existe
+
+        try {
+            String exePath = new File(MainWindow.class.getProtectionDomain()
+                    .getCodeSource()
+                    .getLocation()
+                    .toURI()).getParent() + "\\" + nombre + ".exe";
+
+            String vbs = """
+            Set oWS = WScript.CreateObject("WScript.Shell")
+            sLinkFile = "%s"
+            Set oLink = oWS.CreateShortcut(sLinkFile)
+            oLink.TargetPath = "%s"
+            oLink.WindowStyle = 1
+            oLink.Save
+        """.formatted(escritorio.toString(), exePath);
+
+            Path tempVbs = Files.createTempFile("shortcut", ".vbs");
+            Files.writeString(tempVbs, vbs);
+            new ProcessBuilder("wscript", tempVbs.toString()).start();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private ToggleButton makeNavButton(String path) {
@@ -1348,8 +1394,69 @@ public class MainWindow extends Application {
         Platform.exit();
     }
 
+    public class ShortcutCreator {
+
+        public static void crearAccesoDirecto(String nombre, Path destinoExe, Path icono) {
+            try {
+                // Ruta al escritorio del usuario
+                String escritorio = System.getProperty("user.home") + "\\Desktop";
+                File accesoDirecto = new File(escritorio, nombre + ".lnk");
+
+                String comando = String.format(
+                        "powershell -NoProfile -ExecutionPolicy Bypass -Command \""
+                                + "$s=(New-Object -COM WScript.Shell).CreateShortcut('%s');"
+                                + "$s.TargetPath='%s';"
+                                + "$s.IconLocation='%s';"
+                                + "$s.Save()\"",
+                        accesoDirecto.getAbsolutePath().replace("\\", "\\\\"),
+                        destinoExe.toAbsolutePath().toString().replace("\\", "\\\\"),
+                        icono.toAbsolutePath().toString().replace("\\", "\\\\")
+                );
+
+                Runtime.getRuntime().exec(comando);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private String getExePath() {
+        // 1. App instalada: usar JPACKAGE_APP_PATH
+        String jpackagePath = System.getenv("JPACKAGE_APP_PATH");
+        if (jpackagePath != null && !jpackagePath.isEmpty()) {
+            return jpackagePath;
+        }
+
+        // 2. App en desarrollo (ejecutando desde IDE o gradle)
+        try {
+            File jarFile = new File(MainWindow.class
+                    .getProtectionDomain()
+                    .getCodeSource()
+                    .getLocation()
+                    .toURI());
+
+            Path jarPath = jarFile.getAbsoluteFile().toPath();
+            Path exePath = jarPath.getParent().getParent().resolve("YaguaLauncher.exe");
+
+            System.out.println("DEBUG exe path (modo dev): " + exePath);
+            return exePath.toString();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
 
 
+    private Path extraerRecursoComoArchivoTemporal(String resourcePath, String nombreArchivo) throws IOException {
+        InputStream in = getClass().getResourceAsStream(resourcePath);
+        if (in == null)
+            throw new FileNotFoundException("No se encontró el recurso: " + resourcePath);
+
+        Path tempFile = Files.createTempFile(nombreArchivo, null);
+        Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
+        return tempFile;
+    }
 }
 
 
