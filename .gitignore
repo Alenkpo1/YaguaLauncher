@@ -123,3 +123,5 @@ logs/latest.log
 /jre-launcher
 /logs
 logs/latest.log
+/YaguaLauncher/runtime
+/YaguaLauncher/app
