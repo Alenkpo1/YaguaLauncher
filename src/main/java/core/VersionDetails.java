@@ -24,15 +24,24 @@ public class VersionDetails {
         @JsonIgnoreProperties(ignoreUnknown = true)
         public static class Downloads {
             private Artifact artifact;
-            public Artifact getArtifact() {return artifact;}
-            public void setArtifact(Artifact artifact) { this.artifact = artifact;}
+
+            // ⬇️⬇️⬇️ NUEVO: mapear los classifiers (nativos)
+            @JsonProperty("classifiers")
+            private Map<String, Artifact> classifiers;
+
+            public Artifact getArtifact() { return artifact; }
+            public void setArtifact(Artifact artifact) { this.artifact = artifact; }
+
+            // ⬇️⬇️⬇️ GETTER/SETTER NUEVOS
+            public Map<String, Artifact> getClassifiers() { return classifiers; }
+            public void setClassifiers(Map<String, Artifact> classifiers) { this.classifiers = classifiers; }
 
             @JsonIgnoreProperties(ignoreUnknown = true)
             public static class Artifact {
                 private String url;
                 private String sha1;
 
-                public String getUrl() {return url;}
+                public String getUrl() { return url; }
                 public void setUrl(String url) { this.url = url; }
                 public String getSha1() { return sha1; }
                 public void setSha1(String sha1) { this.sha1 = sha1; }

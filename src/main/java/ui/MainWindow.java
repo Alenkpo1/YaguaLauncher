@@ -76,37 +76,37 @@ public class MainWindow extends Application {
     private final Path mcBaseDir = computeMcBaseDir();
 
     private final String SERVER_HOST = "26.56.106.170";
-    private final int    SERVER_PORT = 25565;
+    private final int SERVER_PORT = 25565;
     private final String SERVER_NAME = "Server AlenyToti";
     // — Managers
-    private AuthManager     authManager;
-    private ProfileManager  profileManager;
-    private VersionManager  versionManager;
+    private AuthManager authManager;
+    private ProfileManager profileManager;
+    private VersionManager versionManager;
     private AssetDownloader assetDownloader;
-    private AssetsManager   assetsManager;
-    private LaunchExecutor  launchExecutor;
+    private AssetsManager assetsManager;
+    private LaunchExecutor launchExecutor;
 
     // — Estado de sesión y versiones
     private AuthManager.Session session;
-    private List<String>        allRemoteVersions = Collections.emptyList();
-    private final Set<String>   installedVersions  = new HashSet<>();
+    private List<String> allRemoteVersions = Collections.emptyList();
+    private final Set<String> installedVersions = new HashSet<>();
 
     // — Escenas
     private Scene loginScene, mainScene;
 
-    private VBox                   thumbsColumn;
-    private ImageView              preview;
-    private ObjectProperty<Path>   current;
+    private VBox thumbsColumn;
+    private ImageView preview;
+    private ObjectProperty<Path> current;
 
     // — Login UI
     private TextField usernameField;
-    private Button    loginButton;
-    private Label     loginStatusLabel;
+    private Button loginButton;
+    private Label loginStatusLabel;
 
-    private WatchService           screenshotWatcher;
-    private Thread                 screenshotWatcherThread;
+    private WatchService screenshotWatcher;
+    private Thread screenshotWatcherThread;
 
-    private VBox                   screenshotsPane;
+    private VBox screenshotsPane;
 
     // — Navegación lateral
     private ToggleButton navHome, navProfiles, navVersions, navLaunch;
@@ -123,22 +123,22 @@ public class MainWindow extends Application {
 
     // — Controles sección Perfiles
     private ComboBox<String> profileCombo;
-    private Button           newProfileBtn, saveProfileBtn, deleteProfileBtn;
+    private Button newProfileBtn, saveProfileBtn, deleteProfileBtn;
     private Label serverNameLabel;
     private Circle serverStatusCircle;
     // — Controles sección Versiones
-    private CheckBox         showSnapshotsCheckBox;
+    private CheckBox showSnapshotsCheckBox;
     private ComboBox<String> versionCombo;
-    private Button           downloadButton;
-    private ProgressBar      progressBar;
-    private Label            statusLabel;
+    private Button downloadButton;
+    private ProgressBar progressBar;
+    private Label statusLabel;
 
     private TextArea consoleTextArea;
     // — Controles sección Lanzamiento
     private TextField ramField;
-    private Button    launchButton;
-    private Label  serverLabel;
-    private Label  pingLabel;
+    private Button launchButton;
+    private Label serverLabel;
+    private Label pingLabel;
 
     private Button openDirButton;
     private Button updateButton;
@@ -179,18 +179,18 @@ public class MainWindow extends Application {
         if (fontUrl != null) Font.loadFont(fontUrl.toExternalForm(), 12);
 
         // Inicializa managers
-        authManager     = new AuthManager();
-        profileManager  = new ProfileManager(mcBaseDir);
-        versionManager  = new VersionManager();
+        authManager = new AuthManager();
+        profileManager = new ProfileManager(mcBaseDir);
+        versionManager = new VersionManager();
         assetDownloader = new AssetDownloader();
-        assetsManager   = new AssetsManager(mcBaseDir.resolve("assets"));
+        assetsManager = new AssetsManager(mcBaseDir.resolve("assets"));
         String javaHome = System.getenv("JAVA_HOME");
         if (javaHome == null) javaHome = System.getProperty("java.home");
-        launchExecutor  = new LaunchExecutor(javaHome);
+        launchExecutor = new LaunchExecutor(javaHome);
 
         // Construye escenas
         loginScene = buildLoginScene(stage);
-        mainScene  = buildMainScene(stage);
+        mainScene = buildMainScene(stage);
 
         // Muestra login
         stage.setScene(loginScene);
@@ -200,6 +200,7 @@ public class MainWindow extends Application {
         stage.centerOnScreen();
         stage.setResizable(true);
         stage.show();
+        maybeShowUpdatedToast();
     }
 
     public static class Server {
@@ -211,8 +212,14 @@ public class MainWindow extends Application {
             this.name = name;
             this.address = address;
         }
-        public String getName()    { return name; }
-        public String getAddress() { return address; }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getAddress() {
+            return address;
+        }
     }
 
     private ObservableList<Server> loadServers() {
@@ -263,6 +270,7 @@ public class MainWindow extends Application {
             }
         }, "Ping-Server").start();
     }
+
     private Scene buildLoginScene(Stage stage) {
         usernameField = new TextField();
         usernameField.setPromptText("Usuario");
@@ -293,7 +301,11 @@ public class MainWindow extends Application {
                 return;
             }
             session = authManager.loginOffline(user);
-            try { authManager.saveSession(session); } catch (IOException ex) { ex.printStackTrace(); }
+            try {
+                authManager.saveSession(session);
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
             Stage st = (Stage) loginButton.getScene().getWindow();
             st.setScene(mainScene);
             st.setWidth(854);
@@ -312,7 +324,7 @@ public class MainWindow extends Application {
         bgView.fitWidthProperty().bind(root.widthProperty());
         bgView.fitHeightProperty().bind(root.heightProperty());
         StackPane.setAlignment(overlay, Pos.CENTER_LEFT);
-        StackPane.setMargin(overlay, new Insets(0,0,0,50));
+        StackPane.setMargin(overlay, new Insets(0, 0, 0, 50));
 
         Scene scene = new Scene(root, 1024, 520);
         scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
@@ -321,16 +333,17 @@ public class MainWindow extends Application {
 
 
     private double xOffset, yOffset;
+
     private Scene buildMainScene(Stage stage) {
         // -> Quitar decoración nativa
         stage.initStyle(StageStyle.UNDECORATED);
 
         // 1) Botones laterales
-        navHome     = makeNavButton("/ui/icons/home.png");
+        navHome = makeNavButton("/ui/icons/home.png");
         navProfiles = makeNavButton("/ui/icons/user.png");
         navVersions = makeNavButton("/ui/icons/versions.png");
-        navLaunch   = makeNavButton("/ui/icons/play.png");
-        navConsole  = makeNavButton("/ui/icons/console.png");
+        navLaunch = makeNavButton("/ui/icons/play.png");
+        navConsole = makeNavButton("/ui/icons/console.png");
         navScreenshots = makeNavButton("/ui/icons/screenshots.png");
         ToggleGroup navGroup = new ToggleGroup();
         for (var tb : List.of(navHome, navProfiles, navVersions, navLaunch, navConsole, navScreenshots)) {
@@ -352,11 +365,11 @@ public class MainWindow extends Application {
         buildScreenshotsPane();
         StackPane content = new StackPane(homePane, profilesPane, versionsPane, launchPane, consolePane, screenshotsPane);
         showOnly(homePane);
-        navHome    .setOnAction(e -> showOnly(homePane));
+        navHome.setOnAction(e -> showOnly(homePane));
         navProfiles.setOnAction(e -> showOnly(profilesPane));
         navVersions.setOnAction(e -> showOnly(versionsPane));
-        navLaunch  .setOnAction(e -> showOnly(launchPane));
-        navConsole .setOnAction(e -> showOnly(consolePane));
+        navLaunch.setOnAction(e -> showOnly(launchPane));
+        navConsole.setOnAction(e -> showOnly(consolePane));
         navScreenshots.setOnAction(e -> showOnly(screenshotsPane));
 
 
@@ -388,7 +401,7 @@ public class MainWindow extends Application {
         mainPane.setTop(serverBox);
 
         // 5) Barra de título custom (flotando encima)
-        Label titleLabel = new Label("YaguaLauncher");
+        Label titleLabel = new Label("YaguaLauncher 1.0.8");
         titleLabel.getStyleClass().add("window-title");
 
         Button btnMin = new Button("–");
@@ -435,7 +448,7 @@ public class MainWindow extends Application {
 
         // 8) Ping periódico cada 5s
         Timeline pingTimer = new Timeline(
-                new KeyFrame(Duration.ZERO,    e -> pingServer()),
+                new KeyFrame(Duration.ZERO, e -> pingServer()),
                 new KeyFrame(Duration.seconds(5))
         );
         pingTimer.setCycleCount(Timeline.INDEFINITE);
@@ -454,7 +467,7 @@ public class MainWindow extends Application {
                 while (true) {
                     WatchKey key = ws.take();
                     for (var ev : key.pollEvents()) {
-                        Path changed = (Path)ev.context();
+                        Path changed = (Path) ev.context();
                         if (changed.equals(cssFile.getFileName())) {
                             Platform.runLater(() -> {
                                 scene.getStylesheets().clear();
@@ -486,13 +499,13 @@ public class MainWindow extends Application {
                     .toURI()).getParent() + "\\" + nombre + ".exe";
 
             String vbs = """
-            Set oWS = WScript.CreateObject("WScript.Shell")
-            sLinkFile = "%s"
-            Set oLink = oWS.CreateShortcut(sLinkFile)
-            oLink.TargetPath = "%s"
-            oLink.WindowStyle = 1
-            oLink.Save
-        """.formatted(escritorio.toString(), exePath);
+                        Set oWS = WScript.CreateObject("WScript.Shell")
+                        sLinkFile = "%s"
+                        Set oLink = oWS.CreateShortcut(sLinkFile)
+                        oLink.TargetPath = "%s"
+                        oLink.WindowStyle = 1
+                        oLink.Save
+                    """.formatted(escritorio.toString(), exePath);
 
             Path tempVbs = Files.createTempFile("shortcut", ".vbs");
             Files.writeString(tempVbs, vbs);
@@ -516,11 +529,11 @@ public class MainWindow extends Application {
         }
         ToggleButton btn = new ToggleButton();
         btn.setGraphic(iv);
-        btn.setPrefSize(48,48);
+        btn.setPrefSize(48, 48);
         return btn;
     }
 
-    private void showOnly(Region pane){
+    private void showOnly(Region pane) {
         homePane.setVisible(false);
         profilesPane.setVisible(false);
         versionsPane.setVisible(false);
@@ -532,9 +545,9 @@ public class MainWindow extends Application {
 
     private void buildHomePane() {
         InputStream b = getClass().getResourceAsStream("/ui/images/home_banner.jpg");
-        Node banner = (b!=null)
+        Node banner = (b != null)
                 ? new ImageView(new Image(b))
-                : createPlaceholder(600,200);
+                : createPlaceholder(600, 200);
         if (banner instanceof ImageView iv) {
             iv.setPreserveRatio(true);
             iv.setFitWidth(600);
@@ -566,9 +579,9 @@ public class MainWindow extends Application {
     private void buildProfilesPane() {
         Label h = new Label("Perfiles");
         h.getStyleClass().add("section-header");
-        profileCombo     = new ComboBox<>();
-        newProfileBtn    = new Button("Nuevo perfil");
-        saveProfileBtn   = new Button("Guardar perfil");
+        profileCombo = new ComboBox<>();
+        newProfileBtn = new Button("Nuevo perfil");
+        saveProfileBtn = new Button("Guardar perfil");
         deleteProfileBtn = new Button("Borrar perfil");
         HBox row = new HBox(8, profileCombo, newProfileBtn, saveProfileBtn, deleteProfileBtn);
         row.getStyleClass().add("section-row");
@@ -577,18 +590,18 @@ public class MainWindow extends Application {
         profilesPane.setPadding(new Insets(20));
         profilesPane.getStyleClass().add("section-pane");
 
-        newProfileBtn   .setOnAction(e->createNewProfile());
-        saveProfileBtn  .setOnAction(e->saveCurrentProfile());
-        deleteProfileBtn.setOnAction(e->deleteSelectedProfile());
-        profileCombo    .setOnAction(e->applySelectedProfile());
+        newProfileBtn.setOnAction(e -> createNewProfile());
+        saveProfileBtn.setOnAction(e -> saveCurrentProfile());
+        deleteProfileBtn.setOnAction(e -> deleteSelectedProfile());
+        profileCombo.setOnAction(e -> applySelectedProfile());
     }
 
     private void buildVersionsPane() {
         Label h = new Label("Versiones");
         h.getStyleClass().add("section-header");
         showSnapshotsCheckBox = new CheckBox("Mostrar snapshots");
-        versionCombo          = new ComboBox<>();
-        downloadButton        = new Button("Descargar versión");
+        versionCombo = new ComboBox<>();
+        downloadButton = new Button("Descargar versión");
         HBox row = new HBox(8, showSnapshotsCheckBox, versionCombo, downloadButton);
         row.getStyleClass().add("section-row");
 
@@ -599,10 +612,10 @@ public class MainWindow extends Application {
         versionsPane.setPadding(new Insets(20));
         versionsPane.getStyleClass().add("section-pane");
 
-        showSnapshotsCheckBox.setOnAction(e->refreshVersionList());
+        showSnapshotsCheckBox.setOnAction(e -> refreshVersionList());
         versionCombo.getSelectionModel().selectedItemProperty()
-                .addListener((obs,o,n)-> onVersionSelected(n));
-        downloadButton.setOnAction(e->downloadVersionAssets());
+                .addListener((obs, o, n) -> onVersionSelected(n));
+        downloadButton.setOnAction(e -> downloadVersionAssets());
     }
 
     private void buildLaunchPane() {
@@ -675,16 +688,16 @@ public class MainWindow extends Application {
 
 
     private void disablePlayButtons() {
-        bigPlay    .setText("Jugando…");
-        bigPlay    .setDisable(true);
+        bigPlay.setText("Jugando…");
+        bigPlay.setDisable(true);
 
         launchButton.setText("Jugando…");
         launchButton.setDisable(true);
     }
 
     private void enablePlayButtons() {
-        bigPlay    .setText("JUGAR");
-        bigPlay    .setDisable(false);
+        bigPlay.setText("JUGAR");
+        bigPlay.setDisable(false);
 
         launchButton.setText("Lanzar Minecraft");
         launchButton.setDisable(false);
@@ -692,7 +705,7 @@ public class MainWindow extends Application {
 
     private Node createPlaceholder(int w, int h) {
         Region ph = new Region();
-        ph.setPrefSize(w,h);
+        ph.setPrefSize(w, h);
         ph.setStyle("-fx-background-color:#333;");
         return ph;
     }
@@ -700,32 +713,33 @@ public class MainWindow extends Application {
     private Label createTitleLabel(String text) {
         Label lbl = new Label(text);
         lbl.setTextFill(javafx.scene.paint.Color.WHITE);
-        lbl.setFont(Font.font("Roboto",24));
+        lbl.setFont(Font.font("Roboto", 24));
         return lbl;
     }
 
-    private void postLoginInit(){
+    private void postLoginInit() {
         scanInstalledVersions();
         profileCombo.getItems().setAll(profileManager.getProfiles().keySet());
         loadVersionsAsync();
     }
 
-    private void scanInstalledVersions(){
+    private void scanInstalledVersions() {
         installedVersions.clear();
-        try(DirectoryStream<Path> ds = Files.newDirectoryStream(mcBaseDir.resolve("versions"))){
-            for(Path v: ds){
-                if(Files.isDirectory(v) && Files.exists(v.resolve(v.getFileName()+".jar"))){
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(mcBaseDir.resolve("versions"))) {
+            for (Path v : ds) {
+                if (Files.isDirectory(v) && Files.exists(v.resolve(v.getFileName() + ".jar"))) {
                     installedVersions.add(v.getFileName().toString());
                 }
             }
-        }catch(IOException ignored){}
+        } catch (IOException ignored) {
+        }
     }
 
-    private void createNewProfile(){
+    private void createNewProfile() {
         TextInputDialog dlg = new TextInputDialog();
         dlg.setHeaderText("Nombre del nuevo perfil:");
-        dlg.showAndWait().ifPresent(name->{
-            if(!name.isBlank()){
+        dlg.showAndWait().ifPresent(name -> {
+            if (!name.isBlank()) {
                 Profile p = new Profile(
                         name,
                         versionCombo.getValue(),
@@ -738,9 +752,9 @@ public class MainWindow extends Application {
         });
     }
 
-    private void saveCurrentProfile(){
+    private void saveCurrentProfile() {
         String name = profileCombo.getValue();
-        if(name!=null){
+        if (name != null) {
             Profile p = new Profile(
                     name,
                     versionCombo.getValue(),
@@ -750,68 +764,71 @@ public class MainWindow extends Application {
         }
     }
 
-    private void deleteSelectedProfile(){
+    private void deleteSelectedProfile() {
         String name = profileCombo.getValue();
-        if(name!=null){
+        if (name != null) {
             profileManager.remove(name);
             profileCombo.getItems().remove(name);
             profileCombo.getSelectionModel().clearSelection();
         }
     }
 
-    private void applySelectedProfile(){
+    private void applySelectedProfile() {
         String name = profileCombo.getValue();
-        if(name!=null){
+        if (name != null) {
             Profile p = profileManager.getProfiles().get(name);
             versionCombo.getSelectionModel().select(p.getVersionId());
             ramField.setText(String.valueOf(p.getRamMb()));
         }
     }
 
-    private void loadVersionsAsync(){
+    private void loadVersionsAsync() {
         versionCombo.setDisable(true);
         downloadButton.setDisable(true);
         showSnapshotsCheckBox.setDisable(true);
 
         Task<List<String>> t = new Task<>() {
-            @Override protected List<String> call() throws Exception {
+            @Override
+            protected List<String> call() throws Exception {
                 versionManager.fetchManifest();
                 return versionManager.getVersionsIds();
             }
         };
-        t.setOnSucceeded(evt->{
+        t.setOnSucceeded(evt -> {
             allRemoteVersions = t.getValue();
             showSnapshotsCheckBox.setDisable(false);
             refreshVersionList();
         });
-        t.setOnFailed(evt->statusLabel.setText("Error cargando versiones"));
-        new Thread(t){{ setDaemon(true); }}.start();
+        t.setOnFailed(evt -> statusLabel.setText("Error cargando versiones"));
+        new Thread(t) {{
+            setDaemon(true);
+        }}.start();
     }
 
-    private void refreshVersionList(){
+    private void refreshVersionList() {
         List<String> items = new ArrayList<>();
         boolean snap = showSnapshotsCheckBox.isSelected();
-        for(String id : allRemoteVersions){
-            if(id.matches("\\d+(?:\\.\\d+)*") ||
+        for (String id : allRemoteVersions) {
+            if (id.matches("\\d+(?:\\.\\d+)*") ||
                     (snap && id.matches("\\d{2}w\\d{2}[a-z]"))) {
                 items.add(id);
             }
         }
-        for(String loc : installedVersions){
-            if(!items.contains(loc)) items.add(loc);
+        for (String loc : installedVersions) {
+            if (!items.contains(loc)) items.add(loc);
         }
         versionCombo.getItems().setAll(items);
-        if(!items.isEmpty()) {
+        if (!items.isEmpty()) {
             versionCombo.getSelectionModel().selectFirst();
         }
         versionCombo.setDisable(false);
     }
 
-    private void onVersionSelected(String ver){
-        if(ver==null) return;
+    private void onVersionSelected(String ver) {
+        if (ver == null) return;
         boolean inst = installedVersions.contains(ver);
         downloadButton.setDisable(inst);
-        launchButton .setDisable(!inst);
+        launchButton.setDisable(!inst);
     }
 
     private void downloadVersionAssets() {
@@ -827,33 +844,99 @@ public class MainWindow extends Application {
                 // 1) Prepara un directorio "limpio" para la versión
                 Path versionDir = mcBaseDir.resolve("versions").resolve(ver);
                 if (Files.exists(versionDir)) {
-                    // Borra recursivamente cualquier resto de descargas previas
                     try (Stream<Path> walk = Files.walk(versionDir)) {
                         walk.sorted(Comparator.reverseOrder())
                                 .forEach(p -> {
-                                    try { Files.delete(p); }
-                                    catch (IOException ignored) {}
+                                    try {
+                                        Files.delete(p);
+                                    } catch (IOException ignored) {
+                                    }
                                 });
                     }
                 }
-                // Crea el directorio de la versión de nuevo
                 Files.createDirectories(versionDir);
 
                 // 2) Obtiene los detalles de la versión
                 VersionDetails det = versionManager.fetchVersionDetails(ver);
 
-                // 3) Descarga librerías
-                int libs      = det.getLibraries().size();
-                int coreTotal = libs + 1;
-                int coreDone  = 0;
+                // 3) Descarga librerías (.jar normales)
+                int libs = det.getLibraries().size();
+                int coreTotal = libs + 1; // +1 por el client jar
+                int coreDone = 0;
+
                 for (var lib : det.getLibraries()) {
-                    String url = lib.getDownloads().getArtifact().getUrl();
-                    String sha = lib.getDownloads().getArtifact().getSha1();
-                    Path tgt   = mcBaseDir.resolve("libraries")
+                    var dls = lib.getDownloads();
+                    if (dls == null || dls.getArtifact() == null) continue;
+
+                    String url = dls.getArtifact().getUrl();
+                    String sha = dls.getArtifact().getSha1();
+                    Path tgt = mcBaseDir.resolve("libraries")
                             .resolve(Paths.get(pathFromUrl(url)));
+
                     updateMessage("Librería: " + tgt.getFileName());
                     assetDownloader.downloadAndVerify(url, tgt, sha);
                     updateProgress(++coreDone, coreTotal);
+                }
+
+                // 3.bis) Descarga y extracción de Nativos LWJGL para Windows
+                // Directorio de nativos: <.minecraft>/versions/<ver>/<ver>-natives
+                Path nativesDir = versionDir.resolve(ver + "-natives");
+
+                // Limpieza de posibles DLLs viejas
+                if (Files.exists(nativesDir)) {
+                    try (Stream<Path> walk = Files.walk(nativesDir)) {
+                        walk.sorted(Comparator.reverseOrder())
+                                .forEach(p -> {
+                                    try {
+                                        Files.delete(p);
+                                    } catch (IOException ignored) {
+                                    }
+                                });
+                    }
+                }
+                Files.createDirectories(nativesDir);
+
+                // Recorremos classifiers buscando "natives-windows*"
+                for (var lib : det.getLibraries()) {
+                    var dls = lib.getDownloads();
+                    if (dls == null || dls.getClassifiers() == null) continue;
+
+                    for (var entry : dls.getClassifiers().entrySet()) {
+                        String key = entry.getKey();
+                        if (key == null) continue;
+                        String k = key.toLowerCase();
+
+                        // Cubre: natives-windows, natives-windows-64, natives-windows-amd64, etc.
+                        if (!k.contains("natives-windows")) continue;
+
+                        var nat = entry.getValue(); // Artifact
+                        if (nat == null) continue;
+
+                        String url = nat.getUrl();
+                        String sha = nat.getSha1();
+                        if (url == null || sha == null) continue;
+
+                        // Descargamos el jar de nativos a la carpeta de libraries
+                        Path natJar = mcBaseDir.resolve("libraries")
+                                .resolve(Paths.get(pathFromUrl(url)));
+
+                        updateMessage("Nativos: " + natJar.getFileName());
+                        assetDownloader.downloadAndVerify(url, natJar, sha);
+
+                        // Extraemos solo archivos (DLL, etc.), ignorando META-INF
+                        try (java.util.zip.ZipInputStream zin =
+                                     new java.util.zip.ZipInputStream(Files.newInputStream(natJar))) {
+                            java.util.zip.ZipEntry ze;
+                            while ((ze = zin.getNextEntry()) != null) {
+                                if (ze.isDirectory()) continue;
+                                String name = ze.getName();
+                                if (name.startsWith("META-INF/")) continue;
+
+                                Path out = nativesDir.resolve(Paths.get(name).getFileName().toString());
+                                Files.copy(zin, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            }
+                        }
+                    }
                 }
 
                 // 4) Descarga el JAR del cliente
@@ -869,7 +952,7 @@ public class MainWindow extends Application {
                 int totalA = ai.objects.size(), doneA = 0;
                 for (Map.Entry<String, AssetObject> e : ai.objects.entrySet()) {
                     String objectKey = e.getKey();
-                    String hash      = e.getValue().getHash();
+                    String hash = e.getValue().getHash();
                     updateMessage("Asset " + (++doneA) + "/" + totalA + ": " + objectKey);
                     assetsManager.downloadSingleAsset(objectKey, hash);
                     updateProgress(coreDone + doneA, coreTotal + totalA);
@@ -898,19 +981,22 @@ public class MainWindow extends Application {
             task.getException().printStackTrace();
         });
 
-        new Thread(task) {{ setDaemon(true); }}.start();
+        new Thread(task) {{
+            setDaemon(true);
+        }}.start();
     }
 
 
-    private void launchGame(){
+    private void launchGame() {
         String ver = versionCombo.getValue();
-        if(ver==null){
+        if (ver == null) {
             statusLabel.setText("Selecciona una versión primero.");
             return;
         }
         int ram;
-        try { ram = Integer.parseInt(ramField.getText().trim()); }
-        catch(NumberFormatException ex){
+        try {
+            ram = Integer.parseInt(ramField.getText().trim());
+        } catch (NumberFormatException ex) {
             statusLabel.setText("RAM inválida.");
             enablePlayButtons();
             return;
@@ -927,9 +1013,9 @@ public class MainWindow extends Application {
                         ram,
                         null, 0,
                         line -> Platform.runLater(() -> consoleTextArea.appendText(line + "\n")),
-                        err  -> Platform.runLater(() -> consoleTextArea.appendText("[ERR] " + err + "\n"))
+                        err -> Platform.runLater(() -> consoleTextArea.appendText("[ERR] " + err + "\n"))
                 );
-            } catch(Exception ex){
+            } catch (Exception ex) {
                 ex.printStackTrace();
                 Platform.runLater(() -> statusLabel.setText("Error al lanzar"));
             } finally {
@@ -960,8 +1046,11 @@ public class MainWindow extends Application {
         // Doble-click abre en Windows
         preview.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && current.get() != null) {
-                try { Desktop.getDesktop().open(current.get().toFile()); }
-                catch (IOException ex) { ex.printStackTrace(); }
+                try {
+                    Desktop.getDesktop().open(current.get().toFile());
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
             }
         });
 
@@ -998,11 +1087,10 @@ public class MainWindow extends Application {
     }
 
 
-
     private void refreshScreenshotsOnce(Path ssDir) {
-        File[] files = ssDir.toFile().listFiles((d,n)->{
+        File[] files = ssDir.toFile().listFiles((d, n) -> {
             String ln = n.toLowerCase();
-            return ln.endsWith(".png")||ln.endsWith(".jpg")||ln.endsWith(".jpeg");
+            return ln.endsWith(".png") || ln.endsWith(".jpg") || ln.endsWith(".jpeg");
         });
         currentScreenshots.clear();
         thumbsColumn.getChildren().clear();
@@ -1017,7 +1105,7 @@ public class MainWindow extends Application {
             for (File f : files) currentScreenshots.add(f.toPath());
             Path first = files[0].toPath();
             current.set(first);
-            preview.setImage(new Image(first.toUri().toString(), 600,0,true,true));
+            preview.setImage(new Image(first.toUri().toString(), 600, 0, true, true));
 
             // Miniaturas
             for (Path p : currentScreenshots) {
@@ -1029,9 +1117,9 @@ public class MainWindow extends Application {
     private void refreshScreenshots(Path ssDir) {
         // Listado actual en disco
         Set<Path> found = new HashSet<>();
-        File[] files = ssDir.toFile().listFiles((d,n)->{
+        File[] files = ssDir.toFile().listFiles((d, n) -> {
             String ln = n.toLowerCase();
-            return ln.endsWith(".png")||ln.endsWith(".jpg");
+            return ln.endsWith(".png") || ln.endsWith(".jpg");
         });
         if (files != null) for (File f : files) found.add(f.toPath());
 
@@ -1077,12 +1165,12 @@ public class MainWindow extends Application {
                         WatchKey key = screenshotWatcher.take();
                         for (WatchEvent<?> ev : key.pollEvents()) {
                             WatchEvent.Kind<?> kind = ev.kind();
-                            Path filename = ((WatchEvent<Path>)ev).context();
+                            Path filename = ((WatchEvent<Path>) ev).context();
                             Path fullPath = dir.resolve(filename);
 
                             // Solo png/jpg
                             String ln = filename.toString().toLowerCase();
-                            if (!(ln.endsWith(".png")||ln.endsWith(".jpg"))) continue;
+                            if (!(ln.endsWith(".png") || ln.endsWith(".jpg"))) continue;
 
                             Platform.runLater(() -> {
                                 if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
@@ -1094,7 +1182,8 @@ public class MainWindow extends Application {
                         }
                         if (!key.reset()) break;
                     }
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
             }, "Screenshots-Watcher");
             screenshotWatcherThread.setDaemon(true);
             screenshotWatcherThread.start();
@@ -1173,32 +1262,59 @@ public class MainWindow extends Application {
         return p.startsWith("/") ? p.substring(1) : p;
     }
 
-    private static Path computeMcBaseDir(){
+    private static Path computeMcBaseDir() {
         String os = System.getProperty("os.name").toLowerCase();
-        if(os.contains("win")){
+        if (os.contains("win")) {
             String appdata = System.getenv("APPDATA");
-            return Paths.get(appdata!=null?appdata:System.getProperty("user.home"),".minecraft");
+            return Paths.get(appdata != null ? appdata : System.getProperty("user.home"), ".minecraft");
         } else {
-            return Paths.get(System.getProperty("user.home"),".minecraft");
+            return Paths.get(System.getProperty("user.home"), ".minecraft");
         }
     }
 
 
     private String getCurrentVersion() {
-        try (InputStream in = getClass().getResourceAsStream("/version.properties")) {
-            Properties props = new Properties();
-            props.load(in);
-            return props.getProperty("launcher.version", "0.0.0");
-        } catch (IOException e) {
-            e.printStackTrace();
-            return "0.0.0";
+        // 1) Propiedad de sistema opcional (-Dyagua.version=1.0.5)
+        String sys = System.getProperty("yagua.version");
+        if (sys != null && !sys.isBlank()) return normalizeVersion(sys);
+
+        // 2) MANIFEST: Implementation-Version (si lo pone ShadowJar/jpackage)
+        Package pkg = getClass().getPackage();
+        if (pkg != null) {
+            String impl = pkg.getImplementationVersion();
+            if (impl != null && !impl.isBlank()) return normalizeVersion(impl);
         }
+
+        // 3) Recurso version.properties (si lo empaquetaste en resources)
+        try (InputStream in = getClass().getResourceAsStream("/version.properties")) {
+            if (in != null) {
+                Properties props = new Properties();
+                props.load(in);
+                String v = props.getProperty("launcher.version");
+                if (v != null && !v.isBlank()) return normalizeVersion(v);
+            }
+        } catch (IOException ignored) {}
+
+        // 4) Fallback
+        return "0.0.0";
     }
 
+    private String normalizeVersion(String raw) {
+        if (raw == null) return "0.0.0";
+        String s = raw.trim().toLowerCase();
+        // quita prefijo 'v'
+        if (s.startsWith("v")) s = s.substring(1);
+        // toma solo dígitos y puntos del comienzo (descarta -rc1, +build, etc.)
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^(\\d+(?:\\.\\d+)*)")
+                .matcher(s);
+        if (m.find()) return m.group(1);
+        return "0.0.0";
+    }
 
     private String fetchLatestTagName() throws IOException {
-        URL url = new URL("https://api.github.com/repos/TU_USUARIO/YaguaLauncher/releases/latest");
-        HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+        URL url = new URL("https://api.github.com/repos/Alenkpo1/YaguaLauncher/releases/latest");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
         try (BufferedReader r = new BufferedReader(
                 new InputStreamReader(conn.getInputStream()))) {
@@ -1219,65 +1335,69 @@ public class MainWindow extends Application {
         throw new IOException("No pude obtener tag_name de la última release");
     }
 
-    /** Compara semánticamente dos versiones X.Y.Z */
-    private boolean isNewer(String current, String latest) {
-        String[] a = current.replaceFirst("^v","").split("\\.");
-        String[] b = latest .replaceFirst("^v","").split("\\.");
-        for (int i = 0; i < Math.max(a.length, b.length); i++) {
-            int ai = i < a.length ? Integer.parseInt(a[i]) : 0;
-            int bi = i < b.length ? Integer.parseInt(b[i]) : 0;
-            if (bi > ai) return true;
-            if (bi < ai) return false;
-        }
-        return false;
-    }
-    private record ReleaseInfo(String tag, String assetUrl) {}
+    /**
+     * Compara semánticamente dos versiones X.Y.Z
+     */
+    private boolean isNewer(String currentRaw, String latestRaw) {
+        String current = normalizeVersion(currentRaw);
+        String latest  = normalizeVersion(latestRaw);
 
+        String[] a = current.split("\\.");
+        String[] b = latest.split("\\.");
+
+        int len = Math.max(a.length, b.length);
+        for (int i = 0; i < len; i++) {
+            int ai = (i < a.length) ? parseOrZero(a[i]) : 0;
+            int bi = (i < b.length) ? parseOrZero(b[i]) : 0;
+            if (bi > ai) return true;   // latest es mayor
+            if (bi < ai) return false;  // latest es menor
+        }
+        return false; // iguales
+    }
+    private int parseOrZero(String s) {
+        try { return Integer.parseInt(s.trim()); }
+        catch (NumberFormatException e) { return 0; }
+    }
+
+    private record ReleaseInfo(String tag, String assetUrl) {
+    }
 
     private ReleaseInfo fetchLatestReleaseInfo() throws IOException {
-        // 1) Conecta a GitHub API
-        URL apiUrl = new URL("https://api.github.com/repos/TU_USUARIO/YaguaLauncher/releases/latest");
+        URL apiUrl = new URL("https://api.github.com/repos/Alenkpo1/YaguaLauncher/releases/latest");
         HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
         conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-        conn.setConnectTimeout(5000);
-        conn.setReadTimeout(5000);
+        conn.setConnectTimeout(7000);
+        conn.setReadTimeout(7000);
 
         int status = conn.getResponseCode();
-        if (status != 200) {
-            throw new IOException("GitHub API responded with HTTP " + status);
-        }
+        if (status != 200) throw new IOException("GitHub API respondió HTTP " + status);
 
-        // 2) Lee todo el JSON en un StringBuilder
         StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(conn.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
             String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
+            while ((line = reader.readLine()) != null) sb.append(line);
         } finally {
             conn.disconnect();
         }
         String json = sb.toString();
 
-        // 3) Extrae el campo "tag_name"
-        Pattern tagPattern = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
-        Matcher tagMatcher = tagPattern.matcher(json);
-        if (!tagMatcher.find()) {
-            throw new IOException("No se encontró el campo tag_name en la respuesta de GitHub");
-        }
+        // tag_name
+        Matcher tagMatcher = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+        if (!tagMatcher.find()) throw new IOException("No se encontró tag_name");
         String tag = tagMatcher.group(1);
 
-        // 4) Extrae la primera "browser_download_url" (suele apuntar al JAR)
-        Pattern urlPattern = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.exe)\"");
-        Matcher urlMatcher = urlPattern.matcher(json);
-        if (!urlMatcher.find()) {
-            throw new IOException("No se encontró ningún asset .jar en la última release");
-        }
+        // browser_download_url de .exe
+        Matcher urlMatcher = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.exe)\"").matcher(json);
+        if (!urlMatcher.find()) throw new IOException("No se encontró ningún asset .exe en la última release");
         String assetUrl = urlMatcher.group(1);
 
         return new ReleaseInfo(tag, assetUrl);
     }
+
+
+
+
+
 
 
     private void checkForUpdates() {
@@ -1287,6 +1407,7 @@ public class MainWindow extends Application {
                 String current = getCurrentVersion();
                 updateMessage("Buscando actualizaciones…");
                 ReleaseInfo info = fetchLatestReleaseInfo();
+                System.out.println("[Update] current=" + current + " latest=" + info.tag());
                 if (isNewer(current, info.tag())) return info;
                 else return new ReleaseInfo("", "");
             }
@@ -1330,12 +1451,11 @@ public class MainWindow extends Application {
                 };
                 downloadTask.setOnSucceeded(ev -> {
                     try {
-                        scheduleReplaceAndRestart(downloadTask.getValue());
+                        // new: instalador EXE, instala en silencio, deja flag y relanza
+                        scheduleInteractiveInstallAndRestart(downloadTask.getValue(), latestTag);
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                        new Alert(Alert.AlertType.ERROR,
-                                "Error al actualizar:\n" + ex.getMessage()
-                        ).showAndWait();
+                        new Alert(Alert.AlertType.ERROR, "Error al actualizar:\n" + ex.getMessage()).showAndWait();
                         updateButton.setDisable(false);
                     }
                 });
@@ -1358,43 +1478,125 @@ public class MainWindow extends Application {
 
     private Path downloadNewVersion(String assetUrl) throws IOException {
         URL url = new URL(assetUrl);
-        Path tmp = Files.createTempFile("YaguaLauncher-update-", ".jar");
-        try (var in = url.openStream();
-             var out = Files.newOutputStream(tmp,
-                     StandardOpenOption.CREATE,
-                     StandardOpenOption.TRUNCATE_EXISTING)) {
+        String fileName = new File(url.getPath()).getName(); // p.ej. YaguaLauncher-1.2.3-setup.exe
+        Path tmp = Files.createTempFile("YaguaLauncher-update-", "-" + fileName);
+
+        try (InputStream in = url.openStream();
+             OutputStream out = Files.newOutputStream(tmp, StandardOpenOption.TRUNCATE_EXISTING)) {
             in.transferTo(out);
         }
         return tmp;
     }
 
+
+    private void scheduleInteractiveInstallAndRestart(java.nio.file.Path installerExe, String latestTag) throws Exception {
+        String exePath = getExePath(); // tu EXE actual ya instalado
+        String exeName = new java.io.File(exePath).getName();
+
+        String localAppData = System.getenv("LOCALAPPDATA");
+        java.nio.file.Path flagDir  = java.nio.file.Paths.get(localAppData, "YaguaLauncher");
+        java.nio.file.Path flagFile = flagDir.resolve("updated-" + latestTag + ".flag");
+        java.nio.file.Files.createDirectories(flagDir);
+
+        boolean needsElevation = exePath.toLowerCase().startsWith("c:\\program files")
+                || exePath.toLowerCase().startsWith("c:\\program files (x86)");
+
+        // Script .bat temporal que:
+        // 1) espera a que cierre el launcher
+        // 2) ejecuta el instalador con UI y ESPERA a que termine (elevado si hace falta)
+        // 3) deja una bandera y relanza el EXE
+        java.nio.file.Path script = java.nio.file.Files.createTempFile("yagua-update-", ".bat");
+
+        String installer = installerExe.toString().replace("\"","\"\""); // escapar comillas
+        String exeEsc    = exePath.replace("\"","\"\"");
+        String runInstallerBlock =
+                needsElevation
+                        // Program Files -> forzar elevación con UAC y esperar
+                        ? "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process -FilePath '" + installer.replace("\\","\\\\") + "' -Verb RunAs -Wait\""
+                        // per-user -> sin elevación, con UI normal y esperar
+                        : "start /wait \"\" \"" + installer + "\"";
+
+        String logFile = flagDir.resolve("update.log").toString();
+
+        String bat = String.join("\r\n",
+                "@echo off",
+                "setlocal",
+                "echo [YAGUA] Esperando a que cierre el launcher... > \"" + logFile + "\"",
+                ":waitclose",
+                "tasklist /FI \"IMAGENAME eq " + exeName + "\" | find /I \"" + exeName + "\" >nul",
+                "if %ERRORLEVEL%==0 (",
+                "  timeout /t 1 >nul",
+                "  goto waitclose",
+                ")",
+                "",
+                "echo [YAGUA] Ejecutando instalador... >> \"" + logFile + "\"",
+                runInstallerBlock,
+                "set EC=%ERRORLEVEL%",
+                "echo [YAGUA] Instalador terminó con código %EC% >> \"" + logFile + "\"",
+                "",
+                "echo ok > \"" + flagFile.toString() + "\"",
+                "start \"\" \"" + exeEsc + "\"",
+                "endlocal",
+                "exit"
+        );
+        java.nio.file.Files.writeString(script, bat, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+
+        // Abrimos el .bat en una consola (verás el installer con UI). Luego cerramos el launcher.
+        new ProcessBuilder("cmd", "/C", "start", "\"YaguaUpdater\"", script.toString())
+                .inheritIO()
+                .start();
+
+        // Cerramos el launcher para que el instalador pueda reemplazar archivos
+        javafx.application.Platform.exit();
+    }
     /**
      * Crea y ejecuta un .bat que:
      *  - espera a que este proceso termine
      *  - mueve el JAR descargado sobre el JAR actual
      *  - relanza el launcher
      */
-    private void scheduleReplaceAndRestart(Path newExe) throws Exception {
-        Path currentExe = Paths.get(getExePath());
+    private void scheduleExeInstallAndRestart(Path exeInstallerPath, String latestTag) throws Exception {
+        String exePath = getExePath(); // tu método existente que devuelve el EXE actual instalado
+        String exeName = new File(exePath).getName();
 
-        // Crea un script .bat temporal para reemplazar el EXE
-        Path script = Files.createTempFile("update-launcher-", ".bat");
+        String localAppData = System.getenv("LOCALAPPDATA");
+        Path flagDir  = Paths.get(localAppData, "YaguaLauncher");
+        Path flagFile = flagDir.resolve("updated-" + latestTag + ".flag");
+
+        Path script = Files.createTempFile("update-yagua-", ".bat");
         String bat = String.join("\r\n",
                 "@echo off",
-                "echo Esperando que YaguaLauncher cierre…",
-                "ping 127.0.0.1 -n 3 >nul",
-                "move /Y \"" + newExe.toString() + "\" \"" + currentExe.toString() + "\"",
-                "start \"\" \"" + currentExe.toString() + "\"",
+                "set EXE=\"" + exePath + "\"",
+                "set INSTALLER=\"" + exeInstallerPath.toString() + "\"",
+                "set FLAGDIR=\"" + flagDir.toString() + "\"",
+                "set FLAGFILE=\"" + flagFile.toString() + "\"",
+                "",
+                ":waitclose",
+                "tasklist /FI \"IMAGENAME eq " + exeName + "\" | find /I \"" + exeName + "\" >nul",
+                "if %ERRORLEVEL%==0 (",
+                "  timeout /t 1 >nul",
+                "  goto waitclose",
+                ")",
+                "",
+                "if not exist %FLAGDIR% mkdir %FLAGDIR%",
+                "",
+                // Intento en silencio (Inno/NSIS suelen aceptar /S o /silent o /quiet)
+                "\"%INSTALLER%\" /S /silent /quiet",
+                "if %ERRORLEVEL% NEQ 0 (",
+                "  echo Instalador devolvio %ERRORLEVEL%, probando sin silencioso...",
+                "  start /wait \"\" \"%INSTALLER%\"",
+                ")",
+                "",
+                "echo ok > %FLAGFILE%",
+                "start \"\" %EXE%",
                 "exit"
         );
         Files.writeString(script, bat, StandardOpenOption.TRUNCATE_EXISTING);
 
-        // Ejecuta el script
         new ProcessBuilder("cmd", "/C", "start", "\"\"", script.toString())
                 .inheritIO()
                 .start();
 
-        // Cierra este launcher
         Platform.exit();
     }
 
@@ -1451,6 +1653,27 @@ public class MainWindow extends Application {
         }
     }
 
+
+    private void maybeShowUpdatedToast() {
+        try {
+            String localAppData = System.getenv("LOCALAPPDATA");
+            Path dir = Paths.get(localAppData, "YaguaLauncher");
+            if (!Files.isDirectory(dir)) return;
+
+            try (Stream<Path> files = Files.list(dir)) {
+                Optional<Path> flagOpt = files
+                        .filter(p -> p.getFileName().toString().startsWith("updated-") && p.getFileName().toString().endsWith(".flag"))
+                        .findFirst();
+
+                if (flagOpt.isPresent()) {
+                    String fname = flagOpt.get().getFileName().toString(); // updated-v1.2.3.flag
+                    String tag = fname.substring("updated-".length(), fname.length() - ".flag".length());
+                    new Alert(Alert.AlertType.INFORMATION, "Actualizado a " + tag + " correctamente.").showAndWait();
+                    Files.deleteIfExists(flagOpt.get());
+                }
+            }
+        } catch (Exception ignored) {}
+    }
 
     private Path extraerRecursoComoArchivoTemporal(String resourcePath, String nombreArchivo) throws IOException {
         InputStream in = getClass().getResourceAsStream(resourcePath);

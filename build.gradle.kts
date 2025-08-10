@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.tuusuario"
-version = "1.0.0"
+version = "1.0.8"
 
 repositories {
     mavenCentral()
@@ -64,6 +64,16 @@ tasks.withType<ShadowJar> {
     configurations = listOf(project.configurations.runtimeClasspath.get())
     manifest {
         attributes["Main-Class"] = "ui.MainWindow"
+        "Implementation-Title" to "YaguaLauncher"
+        "Implementation-Version" to project.version.toString()
     }
 }
 
+tasks.withType<Jar> {
+    manifest {
+        attributes(
+            "Implementation-Title" to "YaguaLauncher",
+            "Implementation-Version" to project.version.toString()
+        )
+    }
+}

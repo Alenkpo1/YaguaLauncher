@@ -119,3 +119,7 @@ logs/latest.log
 logs/latest.log
 logs/latest.log
 *.exe
+/jre-custom
+/jre-launcher
+/logs
+logs/latest.log
