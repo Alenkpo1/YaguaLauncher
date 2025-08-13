@@ -60,7 +60,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
+import java.util.prefs.Preferences;
 import com.sun.jna.platform.win32.Shell32;
 import com.sun.jna.platform.win32.ShellAPI;
 import com.sun.jna.platform.win32.WinDef;
@@ -181,17 +181,19 @@ public class MainWindow extends Application {
         // Inicializa managers
         authManager = new AuthManager();
         profileManager = new ProfileManager(mcBaseDir);
-        versionManager = new VersionManager();
+        versionManager = new VersionManager(mcBaseDir);
         assetDownloader = new AssetDownloader();
         assetsManager = new AssetsManager(mcBaseDir.resolve("assets"));
         String javaHome = System.getenv("JAVA_HOME");
         if (javaHome == null) javaHome = System.getProperty("java.home");
-        launchExecutor = new LaunchExecutor(javaHome);
+        launchExecutor = new LaunchExecutor(javaHome, versionManager);
 
         // Construye escenas
         loginScene = buildLoginScene(stage);
         mainScene = buildMainScene(stage);
 
+        stage.setWidth(1024);
+        stage.setHeight(600);
         // Muestra login
         stage.setScene(loginScene);
         stage.setTitle("YaguaLauncher");
@@ -272,16 +274,66 @@ public class MainWindow extends Application {
     }
 
     private Scene buildLoginScene(Stage stage) {
+        // Preferencias para recordar el último usuario
+        java.util.prefs.Preferences prefs =
+                java.util.prefs.Preferences.userNodeForPackage(MainWindow.class);
+
         usernameField = new TextField();
         usernameField.setPromptText("Usuario");
         usernameField.getStyleClass().add("login-field");
 
+        // Prefill con el último usuario
+        String lastUser = prefs.get("lastUsername", "");
+        if (!lastUser.isBlank()) {
+            usernameField.setText(lastUser);
+        }
+
         loginButton = new Button("Login");
         loginButton.getStyleClass().add("login-button");
+        loginButton.setDefaultButton(true);                 // Enter dispara el botón
+
         loginStatusLabel = new Label();
         loginStatusLabel.getStyleClass().add("login-status");
         loginStatusLabel.setStyle("-fx-text-fill: tomato;");
 
+        // Acción de login (la usamos para el botón y para Enter en el textfield)
+        Runnable doLogin = () -> {
+            String user = (usernameField.getText() == null) ? "" : usernameField.getText().trim();
+            if (user.isEmpty()) {
+                loginStatusLabel.setText("Ingresa un nombre de usuario.");
+                return;
+            }
+
+            // Login offline (o tu flujo actual)
+            session = authManager.loginOffline(user);
+            try {
+                authManager.saveSession(session);
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+
+            // Guardar último usuario
+            prefs.put("lastUsername", user);
+
+            // Cambiar a la escena principal (construir si aún no existe)
+            Stage st = (Stage) loginButton.getScene().getWindow();
+            if (mainScene == null) {
+                mainScene = buildMainScene(st);
+            }
+            st.setScene(mainScene);
+
+
+            st.setHeight(520);
+            st.centerOnScreen();
+
+            postLoginInit();
+        };
+
+        // Click y Enter
+        loginButton.setOnAction(e -> doLogin.run());
+        usernameField.setOnAction(e -> doLogin.run());      // Enter en el campo usuario
+
+        // Layout del login
         VBox overlay = new VBox(15,
                 createTitleLabel("YaguaLauncher"),
                 usernameField,
@@ -294,32 +346,15 @@ public class MainWindow extends Application {
         overlay.setAlignment(Pos.CENTER_LEFT);
 
         loginButton.setMaxWidth(Double.MAX_VALUE);
-        loginButton.setOnAction(e -> {
-            String user = usernameField.getText().trim();
-            if (user.isEmpty()) {
-                loginStatusLabel.setText("Ingresa un nombre de usuario.");
-                return;
-            }
-            session = authManager.loginOffline(user);
-            try {
-                authManager.saveSession(session);
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-            Stage st = (Stage) loginButton.getScene().getWindow();
-            st.setScene(mainScene);
-            st.setWidth(854);
-            st.setHeight(520);
-            st.centerOnScreen();
-            postLoginInit();
-        });
 
+        // Fondo
         InputStream bgStream = getClass().getResourceAsStream("/ui/images/login_bg.jpg");
         ImageView bgView = (bgStream != null)
                 ? new ImageView(new Image(bgStream))
                 : new ImageView();
         bgView.setPreserveRatio(false);
 
+        // Root
         StackPane root = new StackPane(bgView, overlay);
         bgView.fitWidthProperty().bind(root.widthProperty());
         bgView.fitHeightProperty().bind(root.heightProperty());
@@ -331,7 +366,7 @@ public class MainWindow extends Application {
         return scene;
     }
 
-
+    private final java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(MainWindow.class);
     private double xOffset, yOffset;
 
     private Scene buildMainScene(Stage stage) {
@@ -409,14 +444,15 @@ public class MainWindow extends Application {
         btnMin.setOnAction(e -> stage.setIconified(true));
 
         Button btnMax = new Button("▢");
-        btnMax.getStyleClass().add("window-button");
-        btnMax.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
+        btnMax.getStyleClass().addAll("window-button", "window-button-disabled");
+        btnMax.setDisable(true);
+        btnMax.setOnAction(null);
 
         Button btnClose = new Button("✕");
         btnClose.getStyleClass().addAll("window-button", "window-close");
         btnClose.setOnAction(e -> stage.close());
 
-        HBox windowControls = new HBox(5, btnMin, btnMax, btnClose);
+        HBox windowControls = new HBox(5, btnMin, btnClose);
         windowControls.setAlignment(Pos.CENTER_RIGHT);
 
         Region dragSpacer = new Region();
@@ -443,17 +479,39 @@ public class MainWindow extends Application {
         VBox.setVgrow(mainPane, Priority.ALWAYS);
 
         // 7) Escena y CSS
-        Scene scene = new Scene(root, 1024, 520);
+        Scene scene = new Scene(root, 1024, 600);
         scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
 
         // 8) Ping periódico cada 5s
         Timeline pingTimer = new Timeline(
-                new KeyFrame(Duration.ZERO, e -> pingServer()),
+                new KeyFrame(Duration.ZERO,
+                        e -> pingServer()),
                 new KeyFrame(Duration.seconds(5))
         );
         pingTimer.setCycleCount(Timeline.INDEFINITE);
         pingTimer.play();
 
+        LauncherPrefs prefs = loadPrefs();
+        applyPrefsToUI(prefs);
+
+        if (profileCombo != null)
+            profileCombo.valueProperty().addListener((obs,o,n) -> savePrefs(collectPrefsFromUI()));
+        if (versionCombo != null)
+            versionCombo.valueProperty().addListener((obs,o,n) -> savePrefs(collectPrefsFromUI()));
+        if (showSnapshotsCheckBox != null)
+            showSnapshotsCheckBox.selectedProperty().addListener((obs,o,n) -> savePrefs(collectPrefsFromUI()));
+        if (ramField != null)
+            ramField.textProperty().addListener((obs,o,n) -> savePrefs(collectPrefsFromUI()));
+
+        // Por si el usuario cierra la ventana
+        stage.setOnCloseRequest(e -> savePrefs(collectPrefsFromUI()));
+
+        stage.setResizable(false);
+        stage.setFullScreen(false);
+
+        stage.fullScreenProperty().addListener((obs, oldV, newV) -> {
+            if (newV) stage.setFullScreen(false);
+        });
         return scene;
     }
 
@@ -594,6 +652,10 @@ public class MainWindow extends Application {
         saveProfileBtn.setOnAction(e -> saveCurrentProfile());
         deleteProfileBtn.setOnAction(e -> deleteSelectedProfile());
         profileCombo.setOnAction(e -> applySelectedProfile());
+
+        profileCombo.valueProperty().addListener((obs,o,n) -> {
+            savePrefs(collectPrefsFromUI());
+        });
     }
 
     private void buildVersionsPane() {
@@ -717,9 +779,23 @@ public class MainWindow extends Application {
         return lbl;
     }
 
+    private void selectDefaultProfileFromPrefs() {
+        LauncherPrefs prefs = loadPrefs();
+        String last = (prefs != null) ? prefs.lastProfile : null;
+
+        if (last != null && profileCombo.getItems().contains(last)) {
+            profileCombo.getSelectionModel().select(last);
+        } else if (!profileCombo.getItems().isEmpty()) {
+            profileCombo.getSelectionModel().selectFirst();
+        }
+        applySelectedProfile(); // para que actualice versión/RAM en la UI
+    }
+
     private void postLoginInit() {
         scanInstalledVersions();
         profileCombo.getItems().setAll(profileManager.getProfiles().keySet());
+        selectDefaultProfileFromPrefs();
+        profileCombo.valueProperty().addListener((obs,o,n) -> savePrefs(collectPrefsFromUI()));
         loadVersionsAsync();
     }
 
@@ -841,25 +917,43 @@ public class MainWindow extends Application {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
+                // 0) Nos aseguramos de tener el manifest cargado para poder obtener la URL del JSON
+                if (versionManager.getVersions() == null || versionManager.getVersions().isEmpty()) {
+                    versionManager.fetchManifest();
+                }
+
                 // 1) Prepara un directorio "limpio" para la versión
                 Path versionDir = mcBaseDir.resolve("versions").resolve(ver);
                 if (Files.exists(versionDir)) {
-                    try (Stream<Path> walk = Files.walk(versionDir)) {
-                        walk.sorted(Comparator.reverseOrder())
-                                .forEach(p -> {
-                                    try {
-                                        Files.delete(p);
-                                    } catch (IOException ignored) {
-                                    }
-                                });
+                    try (java.util.stream.Stream<Path> walk = Files.walk(versionDir)) {
+                        walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                            try { Files.delete(p); } catch (IOException ignored) {}
+                        });
                     }
                 }
                 Files.createDirectories(versionDir);
 
-                // 2) Obtiene los detalles de la versión
-                VersionDetails det = versionManager.fetchVersionDetails(ver);
+                // 2) Localiza la URL del JSON de la versión en el manifest y lo guarda como <ver>.json
+                var versionEntry = versionManager.getVersions().stream()
+                        .filter(v -> v.getId().equals(ver))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Versión no encontrada en manifest: " + ver));
 
-                // 3) Descarga librerías (.jar normales)
+                String detailsUrl = versionEntry.getUrl();
+                if (detailsUrl == null || detailsUrl.isBlank()) {
+                    throw new IllegalStateException("No se encontró la URL del JSON para la versión " + ver);
+                }
+
+                Path jsonFile = versionDir.resolve(ver + ".json");
+                updateMessage("Guardando " + ver + ".json");
+                try (InputStream in = new URL(detailsUrl).openStream()) {
+                    Files.copy(in, jsonFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+
+                // 3) Obtiene los detalles de la versión (para libs, jar y assets)
+                VersionDetails det = new VersionManager(mcBaseDir).resolveVersionDetails(ver, mcBaseDir);
+
+                // 4) Descarga librerías (.jar normales)
                 int libs = det.getLibraries().size();
                 int coreTotal = libs + 1; // +1 por el client jar
                 int coreDone = 0;
@@ -870,6 +964,8 @@ public class MainWindow extends Application {
 
                     String url = dls.getArtifact().getUrl();
                     String sha = dls.getArtifact().getSha1();
+                    if (url == null || sha == null) continue;
+
                     Path tgt = mcBaseDir.resolve("libraries")
                             .resolve(Paths.get(pathFromUrl(url)));
 
@@ -878,25 +974,21 @@ public class MainWindow extends Application {
                     updateProgress(++coreDone, coreTotal);
                 }
 
-                // 3.bis) Descarga y extracción de Nativos LWJGL para Windows
-                // Directorio de nativos: <.minecraft>/versions/<ver>/<ver>-natives
+                // 5) Descarga y extracción de Nativos LWJGL (Windows)
+                //    Directorio: <.minecraft>/versions/<ver>/natives  (coincide con LaunchExecutor)
                 Path nativesDir = versionDir.resolve(ver + "-natives");
-
-                // Limpieza de posibles DLLs viejas
                 if (Files.exists(nativesDir)) {
-                    try (Stream<Path> walk = Files.walk(nativesDir)) {
-                        walk.sorted(Comparator.reverseOrder())
-                                .forEach(p -> {
-                                    try {
-                                        Files.delete(p);
-                                    } catch (IOException ignored) {
-                                    }
-                                });
+                    try (java.util.stream.Stream<Path> walk = Files.walk(nativesDir)) {
+                        walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                            try { Files.delete(p); } catch (IOException ignored) {}
+                        });
                     }
                 }
                 Files.createDirectories(nativesDir);
 
-                // Recorremos classifiers buscando "natives-windows*"
+                String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+                boolean isWindows = os.contains("win");
+
                 for (var lib : det.getLibraries()) {
                     var dls = lib.getDownloads();
                     if (dls == null || dls.getClassifiers() == null) continue;
@@ -904,10 +996,10 @@ public class MainWindow extends Application {
                     for (var entry : dls.getClassifiers().entrySet()) {
                         String key = entry.getKey();
                         if (key == null) continue;
-                        String k = key.toLowerCase();
 
-                        // Cubre: natives-windows, natives-windows-64, natives-windows-amd64, etc.
-                        if (!k.contains("natives-windows")) continue;
+                        String k = key.toLowerCase(Locale.ROOT);
+                        // Cubre: natives-windows, natives-windows-*, etc. Solo extraemos en Windows
+                        if (!isWindows || !k.contains("natives-windows")) continue;
 
                         var nat = entry.getValue(); // Artifact
                         if (nat == null) continue;
@@ -923,7 +1015,7 @@ public class MainWindow extends Application {
                         updateMessage("Nativos: " + natJar.getFileName());
                         assetDownloader.downloadAndVerify(url, natJar, sha);
 
-                        // Extraemos solo archivos (DLL, etc.), ignorando META-INF
+                        // Extraemos solo archivos útiles (ignorar META-INF/)
                         try (java.util.zip.ZipInputStream zin =
                                      new java.util.zip.ZipInputStream(Files.newInputStream(natJar))) {
                             java.util.zip.ZipEntry ze;
@@ -933,20 +1025,20 @@ public class MainWindow extends Application {
                                 if (name.startsWith("META-INF/")) continue;
 
                                 Path out = nativesDir.resolve(Paths.get(name).getFileName().toString());
-                                Files.copy(zin, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                                Files.copy(zin, out, StandardCopyOption.REPLACE_EXISTING);
                             }
                         }
                     }
                 }
 
-                // 4) Descarga el JAR del cliente
+                // 6) Descarga el JAR del cliente
                 var cd = det.getClientDownload();
                 Path clientJar = versionDir.resolve(ver + ".jar");
                 updateMessage("Cliente: " + ver + ".jar");
                 assetDownloader.downloadAndVerify(cd.getUrl(), clientJar, cd.getSha1());
                 updateProgress(++coreDone, coreTotal);
 
-                // 5) Descarga los assets
+                // 7) Descarga los assets
                 VersionDetails.AssetIndexInfo aiInfo = det.getAssetIndex();
                 AssetIndex ai = assetsManager.fetchAssetIndex(aiInfo.getUrl(), aiInfo.getId());
                 int totalA = ai.objects.size(), doneA = 0;
@@ -958,7 +1050,7 @@ public class MainWindow extends Application {
                     updateProgress(coreDone + doneA, coreTotal + totalA);
                 }
 
-                // 6) Marca la versión como instalada
+                // 8) Marca la versión como instalada
                 installedVersions.add(ver);
                 updateMessage("¡Descarga completa!");
                 return null;
@@ -974,6 +1066,7 @@ public class MainWindow extends Application {
             statusLabel.textProperty().unbind();
             statusLabel.setText("¡Listo para lanzar!");
             launchButton.setDisable(false);
+            onVersionSelected(ver); // refresca botones
         });
         task.setOnFailed(evt -> {
             statusLabel.textProperty().unbind();
@@ -981,10 +1074,9 @@ public class MainWindow extends Application {
             task.getException().printStackTrace();
         });
 
-        new Thread(task) {{
-            setDaemon(true);
-        }}.start();
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
+
 
 
     private void launchGame() {
@@ -1684,6 +1776,78 @@ public class MainWindow extends Application {
         Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
         return tempFile;
     }
+
+    private static class LauncherPrefs {
+        public String lastProfile;
+        public String lastProfileId;
+        public String lastVersionId;
+        public boolean showSnapshots;
+        public Integer ramMb;
+    }
+
+    // Ruta: <.minecraft>/launcher_prefs.json
+    private Path prefsPath() {
+        return mcBaseDir.resolve("launcher_prefs.json");
+    }
+
+    private LauncherPrefs loadPrefs() {
+        try {
+            Path p = prefsPath();
+            if (Files.isRegularFile(p)) {
+                return new com.fasterxml.jackson.databind.ObjectMapper().readValue(p.toFile(), LauncherPrefs.class);
+            }
+        } catch (Exception ignored) {}
+        return new LauncherPrefs(); // vacío por defecto
+    }
+
+    private void savePrefs(LauncherPrefs prefs) {
+        try {
+            Path p = prefsPath();
+            Files.createDirectories(p.getParent());
+            new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValue(p.toFile(), prefs);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Captura el estado actual de la UI
+    private LauncherPrefs collectPrefsFromUI() {
+        LauncherPrefs prefs = new LauncherPrefs();
+        prefs.lastProfileId = (profileCombo != null) ? profileCombo.getValue() : null;
+        prefs.lastVersionId = (versionCombo != null) ? versionCombo.getValue() : null;
+        prefs.lastProfile = (profileCombo != null) ? profileCombo.getValue() : null;
+        prefs.showSnapshots = (showSnapshotsCheckBox != null) && showSnapshotsCheckBox.isSelected();
+        try {
+            prefs.ramMb = (ramField != null) ? Integer.parseInt(ramField.getText().trim()) : null;
+        } catch (NumberFormatException ignored) {}
+        return prefs;
+    }
+
+    // Aplica prefs a la UI si los ítems existen
+    private void applyPrefsToUI(LauncherPrefs prefs) {
+        if (prefs == null) return;
+
+        if (showSnapshotsCheckBox != null)
+            showSnapshotsCheckBox.setSelected(prefs.showSnapshots);
+
+        if (ramField != null && prefs.ramMb != null)
+            ramField.setText(String.valueOf(prefs.ramMb));
+
+        // Como los combos pueden poblarse asíncronos, usa Platform.runLater
+        Platform.runLater(() -> {
+            if (profileCombo != null && prefs.lastProfileId != null &&
+                    profileCombo.getItems().contains(prefs.lastProfileId)) {
+                profileCombo.setValue(prefs.lastProfileId);
+            }
+            if (versionCombo != null && prefs.lastVersionId != null &&
+                    versionCombo.getItems().contains(prefs.lastVersionId)) {
+                versionCombo.setValue(prefs.lastVersionId);
+            }
+        });
+    }
+
 }
 
 

@@ -6,18 +6,66 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class VersionDetails {
-    //clases internas para mapear librerias y el cliente
+    // ===== Campos para compatibilidad con OptiFine/Fabric/Forge =====
+    @JsonProperty("inheritsFrom")
+    private String inheritsFrom;
 
+    @JsonProperty("assets")
+    private String assets;
+
+    @JsonProperty("mainClass")
+    private String mainClass;
+
+    public String getInheritsFrom() { return inheritsFrom; }
+    public void setInheritsFrom(String inheritsFrom) { this.inheritsFrom = inheritsFrom; }
+
+    public String getAssets() { return assets; }
+    public void setAssets(String assets) { this.assets = assets; }
+
+    public String getMainClass() { return mainClass; }
+    public void setMainClass(String mainClass) { this.mainClass = mainClass; }
+
+    // ====== NUEVO: soporte para "arguments" (formato moderno) ======
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Arguments {
+        @JsonProperty("game")
+        private List<Object> game;   // mezcla de String y objetos { rules, value }
+        @JsonProperty("jvm")
+        private List<Object> jvm;
+
+        public List<Object> getGame() { return game; }
+        public void setGame(List<Object> game) { this.game = game; }
+        public List<Object> getJvm() { return jvm; }
+        public void setJvm(List<Object> jvm) { this.jvm = jvm; }
+    }
+
+    @JsonProperty("arguments")
+    private Arguments arguments;
+    public Arguments getArguments() { return arguments; }
+    public void setArguments(Arguments arguments) { this.arguments = arguments; }
+
+    // ===== Lo que ya tenías =====
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Library {
         private Downloads downloads;
 
+        @JsonProperty("name")
+        private String name;
+
+        @JsonProperty("url")
+        private String repositoryUrl;
+
+        public String getName() { return name; }
+        public void setName(String n) { this.name = n; }
+        public String getRepositoryUrl() { return repositoryUrl; }
+        public void setRepositoryUrl(String u) { this.repositoryUrl = u; }
         public Downloads getDownloads() {return downloads;}
         public void setDownloads(Downloads downloads) { this.downloads = downloads; }
 
@@ -25,14 +73,12 @@ public class VersionDetails {
         public static class Downloads {
             private Artifact artifact;
 
-            // ⬇️⬇️⬇️ NUEVO: mapear los classifiers (nativos)
             @JsonProperty("classifiers")
             private Map<String, Artifact> classifiers;
 
             public Artifact getArtifact() { return artifact; }
             public void setArtifact(Artifact artifact) { this.artifact = artifact; }
 
-            // ⬇️⬇️⬇️ GETTER/SETTER NUEVOS
             public Map<String, Artifact> getClassifiers() { return classifiers; }
             public void setClassifiers(Map<String, Artifact> classifiers) { this.classifiers = classifiers; }
 
@@ -49,6 +95,11 @@ public class VersionDetails {
         }
     }
 
+    @JsonProperty("minecraftArguments")
+    private String minecraftArguments;
+    public String getMinecraftArguments() { return minecraftArguments; }
+    public void setMinecraftArguments(String s) { this.minecraftArguments = s; }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ClientDownload{
         @JsonProperty("url")
@@ -59,45 +110,26 @@ public class VersionDetails {
         public void setUrl(String url) { this.url = url; }
         public String getSha1() { return sha1; }
         public void setSha1(String sha1) { this.sha1 = sha1; }
-
     }
+
     private List<Library> libraries;
 
     @JsonProperty("downloads")
     private DownloadsWrapper downloads;
 
-    public List<Library> getLibraries() {
-        return libraries;
-    }
-    public void setLibraries(List<Library> libraries) {
-        this.libraries = libraries;
-    }
+    public List<Library> getLibraries() { return libraries; }
+    public void setLibraries(List<Library> libraries) { this.libraries = libraries; }
 
     public ClientDownload getClientDownload() {
-        return downloads.client;
-
+        return (downloads != null) ? downloads.client : null;
     }
 
-    /**
-     * Wrapper para la seccion de descargas del Json
-     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DownloadsWrapper {
         @JsonProperty("client")
         private ClientDownload client;
         public ClientDownload getClient() {return client;}
         public void setClient(ClientDownload client) { this.client = client; }
-    }
-
-    /**
-     * Carga desde la URL dada (campo url de la Version del manifiesto) y parsea en un VersionDetails.
-     * @param detailsUrl URL al JSON de detalles de la versión
-     * @return instancia de VersionDetails con librerías y client.jar
-     * @throws IOException si falla la descarga o parseo
-     */
-    public static VersionDetails loadFromUrl(String detailsUrl) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.readValue(new URL(detailsUrl), VersionDetails.class);
     }
 
     @JsonProperty("assetIndex")
@@ -109,8 +141,6 @@ public class VersionDetails {
     private String type;
     public String getType() { return type; }
 
-
-    /** Clase que mapea los campos de assetIndex */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AssetIndexInfo {
         private String id;
@@ -125,7 +155,6 @@ public class VersionDetails {
         public void setSha1(String sha1) { this.sha1 = sha1; }
     }
 
-    /** Mapea los objetos dentro del índice de assets */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AssetObject {
         private String hash;
@@ -133,16 +162,13 @@ public class VersionDetails {
         public void setHash(String hash) { this.hash = hash; }
     }
 
-    /** Clase para representar todo el asset index cuando lo parseemos */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AssetIndex {
         private Map<String, AssetObject> objects;
         public Map<String, AssetObject> getObjects() { return objects; }
         public void setObjects(Map<String, AssetObject> objects) { this.objects = objects; }
     }
-    /**
-     * Clase auxiliar para exponer  los datos de descarga.
-     */
+
     public static class ArtifactInfo {
         public final String url;
         public final String sha1;
@@ -152,6 +178,19 @@ public class VersionDetails {
             this.url = url;
             this.sha1 = sha1;
             this.targetPath = targetPath;
+        }
+    }
+
+    // ===== Helpers de carga =====
+    public static VersionDetails loadFromUrl(String detailsUrl) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(new URL(detailsUrl), VersionDetails.class);
+    }
+
+    public static VersionDetails loadFromFile(Path jsonPath) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        try (var in = Files.newInputStream(jsonPath)) {
+            return mapper.readValue(in, VersionDetails.class);
         }
     }
 }

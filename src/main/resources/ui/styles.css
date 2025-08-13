@@ -164,6 +164,17 @@
     -fx-text-fill: rgba(154, 16, 144, 0.26);
 }
 
+.window-button:disabled {
+    -fx-opacity: 0.35;
+    -fx-cursor: default;
+    -fx-background-color: transparent;
+    -fx-border-color: rgba(255,255,255,0.35);
+    -fx-text-fill: rgba(255,255,255,0.6);
+}
+
+
+
+
 /* fondo del VBox de consola (opcional si quieres margen violeta) */
 .console-pane {
     -fx-background-color: #380193;
