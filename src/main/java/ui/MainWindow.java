@@ -436,7 +436,7 @@ public class MainWindow extends Application {
         mainPane.setTop(serverBox);
 
         // 5) Barra de título custom (flotando encima)
-        Label titleLabel = new Label("YaguaLauncher 1.0.8");
+        Label titleLabel = new Label("YaguaLauncher");
         titleLabel.getStyleClass().add("window-title");
 
         Button btnMin = new Button("–");

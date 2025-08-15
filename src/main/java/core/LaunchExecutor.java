@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.function.Consumer;
 
 public class LaunchExecutor {
+    private static final String DEFAULT_LIB_REPO = "https://libraries.minecraft.net/";
     private final String javaBin;
     private final VersionManager injectedVm;
 
@@ -33,27 +34,27 @@ public class LaunchExecutor {
                        Consumer<String> stdoutListener,
                        Consumer<String> stderrListener) throws IOException, InterruptedException {
 
-        // 1) Cargar detalles (con fallback local para OptiFine/Fabric/etc.)
+        // --------- Cargar detalles (herencia + local si es posible) ---------
         VersionDetails det;
-        VersionManager vm = (injectedVm != null) ? injectedVm : new VersionManager(gameDir.toPath());
+        VersionManager vm = (injectedVm != null) ? injectedVm : new VersionManager();
         try {
             det = vm.resolveVersionDetails(versionId, gameDir.toPath());
         } catch (Throwable ignore) {
             det = vm.fetchVersionDetails(versionId);
         }
 
-        // 2) Rutas base
-        String assetsDir = new File(gameDir, "assets").getAbsolutePath();
-        File librariesRoot = new File(gameDir, "libraries");
-        File versionDir = new File(gameDir, "versions" + File.separator + versionId);
+        // --------- Rutas base ---------
+        String assetsDir     = new File(gameDir, "assets").getAbsolutePath();
+        File   librariesRoot = new File(gameDir, "libraries");
+        File   versionDir    = new File(gameDir, "versions" + File.separator + versionId);
         if (!versionDir.isDirectory()) versionDir.mkdirs();
 
-        // 3) mainClass (del JSON si existe; si no, vanilla)
-        String mainClass = (det.getMainClass() != null && !det.getMainClass().isBlank())
+        // --------- mainClass (del JSON si existe; si no, vanilla) ---------
+        String jsonMainClass = (det.getMainClass() != null && !det.getMainClass().isBlank())
                 ? det.getMainClass()
                 : "net.minecraft.client.main.Main";
 
-        // 4) assetIndex o assets (fallback)
+        // --------- assetIndex o assets (fallback) ---------
         String assetIndexId = (det.getAssetIndex() != null) ? det.getAssetIndex().getId() : null;
         if (assetIndexId == null) {
             assetIndexId = (det.getAssets() != null && !det.getAssets().isBlank())
@@ -61,11 +62,13 @@ public class LaunchExecutor {
                     : "legacy";
         }
 
-        // 5) Armar classpath con TODAS las libs + client.jar
+        // --------- Classpath: librerías + client.jar ---------
         List<String> cp = new ArrayList<>();
 
         for (VersionDetails.Library lib : det.getLibraries()) {
             VersionDetails.Library.Downloads dls = lib.getDownloads();
+
+            // Caso 1: URL directa
             if (dls != null && dls.getArtifact() != null && dls.getArtifact().getUrl() != null) {
                 String url = dls.getArtifact().getUrl();
                 File libFile = new File(librariesRoot, pathFromUrlSafe(url));
@@ -75,53 +78,120 @@ public class LaunchExecutor {
                          var out = new FileOutputStream(libFile)) {
                         in.transferTo(out);
                     } catch (IOException ex) {
-                        // puede venir por "name" + repo alternativo; lo intentamos abajo
+                        // algunas coord. vendrán por "name"
                     }
                 }
                 if (libFile.isFile()) cp.add(libFile.getAbsolutePath());
-            } else if (lib.getName() != null) {
-                // coordenada maven "group:artifact:version"
+                continue;
+            }
+
+            // Caso 2: coordenada maven "group:artifact:version" (+ repo opcional)
+            if (lib.getName() != null && !lib.getName().isBlank()) {
                 File libFile = fileFromMavenCoord(librariesRoot, lib.getName());
-                if (libFile.isFile()) {
-                    cp.add(libFile.getAbsolutePath());
-                } else if (lib.getRepositoryUrl() != null && !lib.getRepositoryUrl().isBlank()) {
-                    // intentar descarga desde repo base
-                    String relPath = mavenPathFromCoord(lib.getName());
-                    String base = lib.getRepositoryUrl();
+                if (!libFile.isFile()) {
+                    String base = (lib.getRepositoryUrl() != null && !lib.getRepositoryUrl().isBlank())
+                            ? lib.getRepositoryUrl()
+                            : DEFAULT_LIB_REPO;
                     if (!base.endsWith("/")) base += "/";
-                    String full = base + relPath;
+                    String relPath = mavenPathFromCoord(lib.getName());
+                    String fullUrl = base + relPath;
+
                     try {
                         ensureParent(libFile);
-                        try (var in = new java.net.URL(full).openStream();
+                        try (var in = new java.net.URL(fullUrl).openStream();
                              var out = new FileOutputStream(libFile)) {
                             in.transferTo(out);
                         }
-                        if (libFile.isFile()) cp.add(libFile.getAbsolutePath());
                     } catch (IOException ignore2) {
-                        // omitimos si no está
+                        // quizás ya esté con otro nombre; lo omitimos si no está
                     }
                 }
+                if (libFile.isFile()) cp.add(libFile.getAbsolutePath());
             }
         }
 
-        // client.jar
+        // client jar al final
         File clientJar = new File(versionDir, versionId + ".jar");
-        if (!clientJar.isFile() && det.getClientDownload() != null && det.getClientDownload().getUrl() != null) {
-            ensureParent(clientJar);
-            try (var in = new java.net.URL(det.getClientDownload().getUrl()).openStream();
-                 var out = new FileOutputStream(clientJar)) {
-                in.transferTo(out);
+        if (!clientJar.isFile()) {
+            if (det.getClientDownload() != null && det.getClientDownload().getUrl() != null) {
+                ensureParent(clientJar);
+                try (var in = new java.net.URL(det.getClientDownload().getUrl()).openStream();
+                     var out = new FileOutputStream(clientJar)) {
+                    in.transferTo(out);
+                }
             }
         }
         if (clientJar.isFile()) cp.add(clientJar.getAbsolutePath());
 
         String classpath = String.join(File.pathSeparator, cp);
 
-        // 6) Nativos
+        // --------- Nativos ---------
         File nativesDir = new File(versionDir, versionId + "-natives");
         if (!nativesDir.exists()) nativesDir.mkdirs();
 
-        // 7) Comando JVM + main
+        // --------- TWEAKS (legacy "minecraftArguments") ---------
+        List<String> extra = new ArrayList<>();
+        boolean hasTweaks = false;
+
+        if (det.getMinecraftArguments() != null && !det.getMinecraftArguments().isBlank()) {
+            extra.addAll(splitArgsAndSubstitute(
+                    det.getMinecraftArguments(),
+                    buildVarsMap(session, versionId, gameDir, assetsDir, assetIndexId, nativesDir)
+            ));
+        }
+
+        // ¿hay --tweakClass ... ?
+        for (int i = 0; i < extra.size(); i++) {
+            String tok = extra.get(i);
+            if ("--tweakClass".equals(tok) || tok.startsWith("--tweakClass=")) {
+                hasTweaks = true;
+                break;
+            }
+        }
+
+        // Si el JSON ya pone LaunchWrapper como mainClass, pero NO hay --tweakClass,
+        // agregamos el de OptiFine si detectamos launchwrapper-of en libraries.
+        boolean usingLaunchWrapperFromJson = jsonMainClass.startsWith("net.minecraft.launchwrapper");
+        boolean hasOFLaunchwrapper = containsLaunchwrapperOf(librariesRoot);
+
+        if (usingLaunchWrapperFromJson && !hasTweaks) {
+            if (hasOFLaunchwrapper) {
+                extra.add("--tweakClass");
+                extra.add("optifine.OptiFineTweaker");
+                hasTweaks = true;
+            } else {
+                // último recurso para compat: VanillaTweaker (por si estuviera el launchwrapper clásico)
+                extra.add("--tweakClass");
+                extra.add("net.minecraft.launchwrapper.VanillaTweaker");
+                hasTweaks = true;
+            }
+        }
+
+        // Si está el fork de OptiFine, quitamos VanillaTweaker para evitar el CNF
+        if (hasOFLaunchwrapper && !extra.isEmpty()) {
+            // pares "--tweakClass" <valor>
+            for (int i = 0; i < extra.size() - 1; ) {
+                if ("--tweakClass".equals(extra.get(i))
+                        && "net.minecraft.launchwrapper.VanillaTweaker".equals(extra.get(i + 1))) {
+                    extra.remove(i + 1);
+                    extra.remove(i);
+                } else {
+                    i++;
+                }
+            }
+            // variante en un solo token
+            extra.removeIf(s ->
+                    "net.minecraft.launchwrapper.VanillaTweaker".equals(s)
+                            || s.equals("--tweakClass=net.minecraft.launchwrapper.VanillaTweaker"));
+        }
+
+        // main class efectiva: si hay tweakers, aseguramos LaunchWrapper
+        String effectiveMainClass = jsonMainClass;
+        if (hasTweaks && !effectiveMainClass.startsWith("net.minecraft.launchwrapper")) {
+            effectiveMainClass = "net.minecraft.launchwrapper.Launch";
+        }
+
+        // --------- Comando ---------
         List<String> cmd = new ArrayList<>();
         cmd.add(javaBin);
         cmd.add("-Xmx" + ramMb + "M");
@@ -129,47 +199,34 @@ public class LaunchExecutor {
         cmd.add("-Dorg.lwjgl.librarypath=" + nativesDir.getAbsolutePath());
         cmd.add("-cp");
         cmd.add(classpath);
-        cmd.add(mainClass);
+        cmd.add(effectiveMainClass);
 
-        // 8) ¿JSON legacy (minecraftArguments) o moderno?
-        boolean legacyArgs = det.getMinecraftArguments() != null
-                && !det.getMinecraftArguments().isBlank();
+        // Args básicos de Minecraft
+        cmd.add("--version");      cmd.add(versionId);
+        String type = (det.getType() != null && !det.getType().isBlank()) ? det.getType()
+                : (versionId.matches("\\d{2}w\\d{2}[a-z]") ? "snapshot" : "release");
+        cmd.add("--versionType");  cmd.add(type);
+        cmd.add("--gameDir");      cmd.add(gameDir.getAbsolutePath());
+        cmd.add("--assetsDir");    cmd.add(assetsDir);
+        cmd.add("--assetIndex");   cmd.add(assetIndexId);
+        cmd.add("--uuid");         cmd.add(session.getUuid());
+        cmd.add("--accessToken");  cmd.add(session.getUuid()); // offline
+        cmd.add("--userProperties"); cmd.add("{}");
+        cmd.add("--userType");     cmd.add("legacy");
+        cmd.add("--username");     cmd.add(session.getUsername());
 
-        if (!legacyArgs) {
-            // ---- MODO MODERNO (vanilla 1.13+): agregamos nuestros args base
-            cmd.add("--version");      cmd.add(versionId);
-            String type = (det.getType()!=null && !det.getType().isBlank())
-                    ? det.getType()
-                    : (versionId.matches("\\d{2}w\\d{2}[a-z]") ? "snapshot" : "release");
-            cmd.add("--versionType");  cmd.add(type);
-            cmd.add("--gameDir");      cmd.add(gameDir.getAbsolutePath());
-            cmd.add("--assetsDir");    cmd.add(assetsDir);
-            cmd.add("--assetIndex");   cmd.add(assetIndexId != null ? assetIndexId : "legacy");
-            cmd.add("--uuid");         cmd.add(session.getUuid());
-            cmd.add("--accessToken");  cmd.add(session.getUuid()); // offline
-            cmd.add("--userProperties"); cmd.add("{}");
-            cmd.add("--userType");     cmd.add("legacy");
-            cmd.add("--username");     cmd.add(session.getUsername());
-        } else {
-            // ---- MODO LEGACY (OptiFine/Forge viejos): usar minecraftArguments del JSON
-            Map<String, String> vars = buildVarsMap(session, versionId, gameDir, assetsDir,
-                    assetIndexId != null ? assetIndexId : "legacy", nativesDir);
-            List<String> extra = splitArgsAndSubstitute(det.getMinecraftArguments(), vars);
-            cmd.addAll(extra);
-        }
-
-        // Auto-conectar y tamaño de ventana (los sumamos en ambos modos)
         if (serverAddress != null && !serverAddress.isBlank()) {
             cmd.add("--server"); cmd.add(serverAddress);
             cmd.add("--port");   cmd.add(String.valueOf(serverPort));
         }
+
         cmd.add("--width");  cmd.add("854");
         cmd.add("--height"); cmd.add("480");
 
-        // (Opcional) ver el comando final para diagnósticos
-        // System.out.println("=== CMD ===\n" + String.join(" ", cmd) + "\n===========");
+        // Añadimos los tweaks finales
+        if (!extra.isEmpty()) cmd.addAll(extra);
 
-        // 9) Ejecutar
+        // --------- Ejecutar ---------
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(gameDir);
 
@@ -265,5 +322,18 @@ public class LaunchExecutor {
             out.add(v);
         }
         return out;
+    }
+
+    /** ¿Existe el jar de OptiFine launchwrapper-of en libraries? */
+    private static boolean containsLaunchwrapperOf(File librariesRoot) {
+        File dir = new File(librariesRoot, "optifine/launchwrapper-of");
+        if (!dir.isDirectory()) return false;
+        File[] vers = dir.listFiles(File::isDirectory);
+        if (vers == null) return false;
+        for (File v : vers) {
+            File[] jars = v.listFiles((d, name) -> name.startsWith("launchwrapper-of-") && name.endsWith(".jar"));
+            if (jars != null && jars.length > 0) return true;
+        }
+        return false;
     }
 }
