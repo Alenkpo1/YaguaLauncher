@@ -49,24 +49,8 @@ public class AuthManager {
         Files.writeString(sessionPath, json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
-    public void clearSession() throws IOException {
-        Path home = Paths.get(System.getProperty("user.home"), ".minecraft");
-        Path f    = home.resolve("session.json");
-        Files.deleteIfExists(f);
-    }
-    /**
-     * Carga la sesión existente desde el archivo local.
-     * @return Session cargada, o null si no existe
-     * @throws IOException si falla la lectura o parseo
-     */
-    public Session loadSession() throws IOException {
-        Path sessionPath = Path.of(System.getProperty("user.home"), SESSION_FILE);
-        File file = sessionPath.toFile();
-        if (!file.exists()) {
-            return null;
-        }
-        return objectMapper.readValue(file, Session.class);
-    }
+
+
 
     /**
      * Representa los datos de sesión de un jugador (offline).
@@ -75,7 +59,7 @@ public class AuthManager {
         private String username;
         private String uuid;
 
-        // Jackson necesita constructor sin argumentos
+
         public Session() {}
 
         public Session(String username, String uuid) {

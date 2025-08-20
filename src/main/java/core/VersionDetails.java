@@ -32,18 +32,15 @@ public class VersionDetails {
     public String getMainClass() { return mainClass; }
     public void setMainClass(String mainClass) { this.mainClass = mainClass; }
 
-    // ====== NUEVO: soporte para "arguments" (formato moderno) ======
+    // arguments
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Arguments {
         @JsonProperty("game")
-        private List<Object> game;   // mezcla de String y objetos { rules, value }
+        private List<Object> game;   // mezcla de String y objetos
         @JsonProperty("jvm")
         private List<Object> jvm;
 
-        public List<Object> getGame() { return game; }
-        public void setGame(List<Object> game) { this.game = game; }
-        public List<Object> getJvm() { return jvm; }
-        public void setJvm(List<Object> jvm) { this.jvm = jvm; }
+
     }
 
     @JsonProperty("arguments")
@@ -51,7 +48,7 @@ public class VersionDetails {
     public Arguments getArguments() { return arguments; }
     public void setArguments(Arguments arguments) { this.arguments = arguments; }
 
-    // ===== Lo que ya tenías =====
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Library {
         private Downloads downloads;
@@ -181,7 +178,7 @@ public class VersionDetails {
         }
     }
 
-    // ===== Helpers de carga =====
+    //Helpers de carga
     public static VersionDetails loadFromUrl(String detailsUrl) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         return mapper.readValue(new URL(detailsUrl), VersionDetails.class);

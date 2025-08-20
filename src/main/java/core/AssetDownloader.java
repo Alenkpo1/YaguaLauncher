@@ -15,7 +15,7 @@ import java.security.NoSuchAlgorithmException;
  * Descarga archivos (librerías, assets, clientes) y verifica su integridad mediante SHA-1.
  */
 public class AssetDownloader {
-    // Cliente HTTP reutilizable
+    // Cliente HTTP
     private final HttpClient httpClient;
 
     public AssetDownloader() {
@@ -41,7 +41,7 @@ public class AssetDownloader {
         // Crear directorio padre si no existe
         Files.createDirectories(destino.getParent());
 
-        // B) Construir la petición HTTP
+        // Construir la petición HTTP
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .GET()
@@ -55,7 +55,7 @@ public class AssetDownloader {
             throw new IOException("Error al descargar archivo: " + response.statusCode());
         }
 
-        // D) Verificar integridad SHA-1
+
         if (!verifySha1(destino, expectedSha1)) {
             throw new IOException("Integridad fallida (SHA-1) para " + destino);
         }

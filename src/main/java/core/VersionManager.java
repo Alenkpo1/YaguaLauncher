@@ -23,7 +23,7 @@ public class VersionManager {
     private final Path mcBaseDir;              // puede ser null si no querés soporte local
     private VersionManifest manifest;
 
-    /** Constructor recomendado: pasá el directorio base de Minecraft (ej: ~/.minecraft). */
+
     public VersionManager(Path mcBaseDir) {
         this.objectMapper = new ObjectMapper();
         this.mcBaseDir = mcBaseDir;
@@ -39,11 +39,7 @@ public class VersionManager {
         manifest = objectMapper.readValue(new URL(MANIFEST_URL), VersionManifest.class);
     }
 
-    /** Devuelve la versión release más reciente. */
-    public String getLatestRealeaseId() {
-        ensureManifestLoaded();
-        return manifest.getLatest().getRelease();
-    }
+
 
     /** Devuelve la lista completa de objetos Version tras parsear el manifiesto. */
     public List<Version> getVersions() {
@@ -66,16 +62,16 @@ public class VersionManager {
      * @param versionId ID de la versión (p.ej. "1.20.1" o "1.21.8-OptiFine_HD_U_J6_pre14")
      */
     public VersionDetails fetchVersionDetails(String versionId) throws IOException {
-        // 1) Intentamos tener el manifiesto (pero no es obligatorio si sólo hay local)
+        // 1) Intentamos tener el manifiesto
         if (manifest == null) {
             try {
                 fetchManifest();
             } catch (IOException ignored) {
-                // Si falla la red, aún podemos intentar el JSON local
+
             }
         }
 
-        // 2) ¿Existe en el manifiesto remoto?
+        // 2) Existe en el manifiesto remoto
         if (manifest != null) {
             Optional<Version> match = manifest.getVersions()
                     .stream()
@@ -88,7 +84,7 @@ public class VersionManager {
             }
         }
 
-        // 3) Fallback a JSON local: <.minecraft>/versions/<id>/<id>.json
+
         if (mcBaseDir != null) {
             Path localJson = mcBaseDir
                     .resolve("versions")
@@ -102,41 +98,32 @@ public class VersionManager {
             }
         }
 
-        // 4) Nada de nada…
+
         throw new IllegalArgumentException("Versión no encontrada: " + versionId);
     }
 
-    /**
-     * Versión “resuelta”: si el JSON de la versión tiene `inheritsFrom`, carga también la base
-     * y hace un merge (bibliotecas, assetIndex, y —si existen en tu VersionDetails— mainClass,
-     * assets y minecraftArguments).
-     *
-     * NOTA: uso reflexión para no obligarte a cambiar tu VersionDetails. Si ya añadiste getters
-     * como getInheritsFrom(), getMainClass(), etc., se usarán. Si no existen, se ignoran.
-     */
+
     public VersionDetails resolveVersionDetails(String versionId, Path gameDir) throws IOException {
         VersionDetails d = fetchVersionDetails(versionId);
 
-        // ¿tiene inheritsFrom?
+
         String parentId = null;
         try {
             var m = d.getClass().getMethod("getInheritsFrom");
             Object v = m.invoke(d);
             if (v instanceof String s && !s.isBlank()) parentId = s;
         } catch (ReflectiveOperationException ignored) {
-            // tu VersionDetails no tiene inheritsFrom -> no hay nada que resolver
+
         }
 
         if (parentId == null) {
             return d;
         }
 
-        // Resolvemos recursivamente el padre
+
         VersionDetails base = resolveVersionDetails(parentId, gameDir);
 
-        // --- Merge simple ---
 
-        // 1) libraries: padre + hijo (hijo al final)
         if (base.getLibraries() != null) {
             if (d.getLibraries() == null || d.getLibraries().isEmpty()) {
                 d.setLibraries(base.getLibraries());
@@ -147,12 +134,12 @@ public class VersionManager {
             }
         }
 
-        // 2) assetIndex si falta en el hijo
+
         if (d.getAssetIndex() == null) {
             d.setAssetIndex(base.getAssetIndex());
         }
 
-        // 3) Si existen estos campos en tu VersionDetails, heredalos si faltan
+
         // mainClass
         try {
             var getMain = d.getClass().getMethod("getMainClass");
@@ -182,7 +169,7 @@ public class VersionManager {
             }
         } catch (ReflectiveOperationException ignored) {}
 
-        // minecraftArguments (tweakClass para OptiFine/Forge antiguos)
+        // minecraftArguments (tweakClass para OptiFine/Forge)
         try {
             var getArgs = d.getClass().getMethod("getMinecraftArguments");
             String args = (String) getArgs.invoke(d);
@@ -199,16 +186,16 @@ public class VersionManager {
         return d;
     }
 
-    /** Verifica que el manifiesto ya se haya cargado antes de acceder a él. */
+    /** Verifica que el manifiesto ya se haya cargado antes de acceder a el. */
     private void ensureManifestLoaded() {
         if (manifest == null) {
             throw new IllegalStateException("Manifest no cargado. Llama primero a fetchManifest().");
         }
     }
 
-    // =========================
+
     //  Clases de mapeo JSON
-    // =========================
+
 
     public static class VersionManifest {
         private Latest latest;

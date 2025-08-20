@@ -15,15 +15,7 @@ public class LaunchExecutor {
         this.injectedVm = injectedVm;
     }
 
-    public void launch(AuthManager.Session session,
-                       String versionId,
-                       File gameDir,
-                       int ramMb,
-                       String serverAddress,
-                       int serverPort) throws IOException, InterruptedException {
-        launch(session, versionId, gameDir, ramMb, serverAddress, serverPort,
-                System.out::println, l -> System.err.println("[ERR] " + l));
-    }
+
 
     public void launch(AuthManager.Session session,
                        String versionId,
@@ -34,7 +26,7 @@ public class LaunchExecutor {
                        Consumer<String> stdoutListener,
                        Consumer<String> stderrListener) throws IOException, InterruptedException {
 
-        // --------- Cargar detalles (herencia + local si es posible) ---------
+        //Cargar detalles
         VersionDetails det;
         VersionManager vm = (injectedVm != null) ? injectedVm : new VersionManager();
         try {
@@ -43,18 +35,18 @@ public class LaunchExecutor {
             det = vm.fetchVersionDetails(versionId);
         }
 
-        // --------- Rutas base ---------
+        //Rutas base
         String assetsDir     = new File(gameDir, "assets").getAbsolutePath();
         File   librariesRoot = new File(gameDir, "libraries");
         File   versionDir    = new File(gameDir, "versions" + File.separator + versionId);
         if (!versionDir.isDirectory()) versionDir.mkdirs();
 
-        // --------- mainClass (del JSON si existe; si no, vanilla) ---------
+        // mainClass
         String jsonMainClass = (det.getMainClass() != null && !det.getMainClass().isBlank())
                 ? det.getMainClass()
                 : "net.minecraft.client.main.Main";
 
-        // --------- assetIndex o assets (fallback) ---------
+        // assetIndex o assets
         String assetIndexId = (det.getAssetIndex() != null) ? det.getAssetIndex().getId() : null;
         if (assetIndexId == null) {
             assetIndexId = (det.getAssets() != null && !det.getAssets().isBlank())
@@ -62,13 +54,13 @@ public class LaunchExecutor {
                     : "legacy";
         }
 
-        // --------- Classpath: librerías + client.jar ---------
+        // Classpath: librerías + client.jar
         List<String> cp = new ArrayList<>();
 
         for (VersionDetails.Library lib : det.getLibraries()) {
             VersionDetails.Library.Downloads dls = lib.getDownloads();
 
-            // Caso 1: URL directa
+
             if (dls != null && dls.getArtifact() != null && dls.getArtifact().getUrl() != null) {
                 String url = dls.getArtifact().getUrl();
                 File libFile = new File(librariesRoot, pathFromUrlSafe(url));
@@ -78,14 +70,14 @@ public class LaunchExecutor {
                          var out = new FileOutputStream(libFile)) {
                         in.transferTo(out);
                     } catch (IOException ex) {
-                        // algunas coord. vendrán por "name"
+
                     }
                 }
                 if (libFile.isFile()) cp.add(libFile.getAbsolutePath());
                 continue;
             }
 
-            // Caso 2: coordenada maven "group:artifact:version" (+ repo opcional)
+
             if (lib.getName() != null && !lib.getName().isBlank()) {
                 File libFile = fileFromMavenCoord(librariesRoot, lib.getName());
                 if (!libFile.isFile()) {
@@ -103,7 +95,7 @@ public class LaunchExecutor {
                             in.transferTo(out);
                         }
                     } catch (IOException ignore2) {
-                        // quizás ya esté con otro nombre; lo omitimos si no está
+
                     }
                 }
                 if (libFile.isFile()) cp.add(libFile.getAbsolutePath());
@@ -125,11 +117,11 @@ public class LaunchExecutor {
 
         String classpath = String.join(File.pathSeparator, cp);
 
-        // --------- Nativos ---------
+        // Nativos
         File nativesDir = new File(versionDir, versionId + "-natives");
         if (!nativesDir.exists()) nativesDir.mkdirs();
 
-        // --------- TWEAKS (legacy "minecraftArguments") ---------
+        // TWEAKS
         List<String> extra = new ArrayList<>();
         boolean hasTweaks = false;
 
@@ -149,7 +141,7 @@ public class LaunchExecutor {
             }
         }
 
-        // Si el JSON ya pone LaunchWrapper como mainClass, pero NO hay --tweakClass,
+        // Si el JSON ya pone LaunchWrapper como mainClass, pero no hay --tweakClass,
         // agregamos el de OptiFine si detectamos launchwrapper-of en libraries.
         boolean usingLaunchWrapperFromJson = jsonMainClass.startsWith("net.minecraft.launchwrapper");
         boolean hasOFLaunchwrapper = containsLaunchwrapperOf(librariesRoot);
@@ -160,16 +152,16 @@ public class LaunchExecutor {
                 extra.add("optifine.OptiFineTweaker");
                 hasTweaks = true;
             } else {
-                // último recurso para compat: VanillaTweaker (por si estuviera el launchwrapper clásico)
+
                 extra.add("--tweakClass");
                 extra.add("net.minecraft.launchwrapper.VanillaTweaker");
                 hasTweaks = true;
             }
         }
 
-        // Si está el fork de OptiFine, quitamos VanillaTweaker para evitar el CNF
+        // Si está el fork de OptiFine, sacamos VanillaTweaker para evitar el CNF
         if (hasOFLaunchwrapper && !extra.isEmpty()) {
-            // pares "--tweakClass" <valor>
+
             for (int i = 0; i < extra.size() - 1; ) {
                 if ("--tweakClass".equals(extra.get(i))
                         && "net.minecraft.launchwrapper.VanillaTweaker".equals(extra.get(i + 1))) {
@@ -191,7 +183,7 @@ public class LaunchExecutor {
             effectiveMainClass = "net.minecraft.launchwrapper.Launch";
         }
 
-        // --------- Comando ---------
+        // Comando
         List<String> cmd = new ArrayList<>();
         cmd.add(javaBin);
         cmd.add("-Xmx" + ramMb + "M");
@@ -210,7 +202,7 @@ public class LaunchExecutor {
         cmd.add("--assetsDir");    cmd.add(assetsDir);
         cmd.add("--assetIndex");   cmd.add(assetIndexId);
         cmd.add("--uuid");         cmd.add(session.getUuid());
-        cmd.add("--accessToken");  cmd.add(session.getUuid()); // offline
+        cmd.add("--accessToken");  cmd.add(session.getUuid());
         cmd.add("--userProperties"); cmd.add("{}");
         cmd.add("--userType");     cmd.add("legacy");
         cmd.add("--username");     cmd.add(session.getUsername());
@@ -223,10 +215,10 @@ public class LaunchExecutor {
         cmd.add("--width");  cmd.add("854");
         cmd.add("--height"); cmd.add("480");
 
-        // Añadimos los tweaks finales
+
         if (!extra.isEmpty()) cmd.addAll(extra);
 
-        // --------- Ejecutar ---------
+        // Ejecutar
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(gameDir);
 
@@ -251,7 +243,7 @@ public class LaunchExecutor {
         p.waitFor();
     }
 
-    // ================== helpers ==================
+    // helpers
 
     private static void ensureParent(File f) throws IOException {
         File parent = f.getParentFile();
@@ -277,7 +269,7 @@ public class LaunchExecutor {
         }
     }
 
-    // "group:artifact:version" -> <libs>/<group/as/path>/<artifact>/<version>/<artifact>-<version>.jar
+
     private static File fileFromMavenCoord(File librariesRoot, String coord) {
         String rel = mavenPathFromCoord(coord);
         return new File(librariesRoot, rel);
@@ -324,7 +316,7 @@ public class LaunchExecutor {
         return out;
     }
 
-    /** ¿Existe el jar de OptiFine launchwrapper-of en libraries? */
+    /** existe el jar de OptiFine launchwrapper-of en libraries */
     private static boolean containsLaunchwrapperOf(File librariesRoot) {
         File dir = new File(librariesRoot, "optifine/launchwrapper-of");
         if (!dir.isDirectory()) return false;

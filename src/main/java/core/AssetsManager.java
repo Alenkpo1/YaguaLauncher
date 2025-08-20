@@ -43,7 +43,7 @@ public class AssetsManager {
     public static class AssetIndex {
         public Map<String, AssetObject> objects;
     }
-    /** Mapea cada entrada; ignoramos “size” */
+    /** Mapea cada entrada */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AssetObject {
         public String hash;
@@ -107,7 +107,7 @@ public class AssetsManager {
                     break;
                 } catch (IOException ioe) {
                     lastEx = ioe;
-                    // Thread.sleep(200);
+
                 }
             }
             if (!Files.exists(objectPath) || lastEx != null && !verifySha1(objectPath, hash)) {

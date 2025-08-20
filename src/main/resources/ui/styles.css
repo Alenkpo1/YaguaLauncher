@@ -1,4 +1,4 @@
-/* Root gradient */
+
 .root {
     -fx-background-color:
             linear-gradient(from 0% 0% to 100% 100%,
@@ -22,10 +22,10 @@
 
 /* Barra lateral */
 .nav-bar {
-    -fx-pref-width: 80px;                /* ancho fijo */
+    -fx-pref-width: 80px;
     -fx-background-color: rgba(0,0,0,0.2);
-    -fx-padding: 15 15;                  /* arriba/abajo 20, izquierda/derecha 10 */
-    -fx-spacing: 20;                     /* separa botones */
+    -fx-padding: 15 15;
+    -fx-spacing: 20;
 }
 
 .nav-button {
@@ -33,17 +33,17 @@
 }
 .nav-button:selected {
     -fx-background-color: transparent;
-    -fx-border-color: #8e2de2;    /* color de acento */
-    -fx-border-width: 0 0 0 4;    /* línea de 4px a la izquierda */
+    -fx-border-color: #8e2de2;
+    -fx-border-width: 0 0 0 4;
 }
 
 .big-play-button {
     -fx-font-size: 16px;
     -fx-background-radius: 8px;
     -fx-border-radius: 8px;
-    -fx-padding: 15 40;      /* arriba/abajo 15px, izquierda/derecha 40px */
-    -fx-min-width: 240px;    /* ancho mínimo */
-    -fx-min-height: 60px;    /* alto mínimo */
+    -fx-padding: 15 40;
+    -fx-min-width: 240px;
+    -fx-min-height: 60px;
     -fx-border-color: white;
     -fx-border-width: 2;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 10, 0, 0, 4);
@@ -144,17 +144,17 @@
     -fx-transition: background-color 150ms ease-in-out;
 }
 
-/* Hover suave */
+
 .window-button:hover {
     -fx-background-color: rgba(255,255,255,0.2);
 }
 
-/* Presionado */
+
 .window-button:pressed {
     -fx-background-color: rgba(255,255,255,0.3);
 }
 
-/* Cerrar – color rojo vivo en hover */
+
 .window-close {
     -fx-border-color: rgba(255, 255, 255, 0.73);
 }
@@ -175,7 +175,7 @@
 
 
 
-/* fondo del VBox de consola (opcional si quieres margen violeta) */
+/* fondo del VBox de consola  */
 .console-pane {
     -fx-background-color: #380193;
 }
@@ -188,7 +188,7 @@
     -fx-font-family: monospace;
 }
 
-/* ScrollPane: quitar fondo por defecto y pintar la viewport */
+/* ScrollPane */
 .console-scroll-pane {
     -fx-background-color: transparent;
 }
@@ -243,7 +243,7 @@
 
 /* Círculo de estado (el fill se controla desde el código) */
 .server-circle {
-    /* podrías colocar un color por defecto transparente aquí */
+
 }
 
 /* Hacer blancas las etiquetas de los CheckBox */
@@ -257,12 +257,12 @@
     -fx-fill: white;
 }
 
-/* ComboBox: texto principal (selected item) */
+/* ComboBox: texto principal  */
 .combo-box {
     -fx-text-fill: white;
 }
 
-/* ComboBox: fondo y borde (opcional para que combine) */
+/* ComboBox: fondo y borde  */
 .combo-box {
     -fx-background-color: rgba(255,255,255,0.1);
     -fx-border-color: rgba(255,255,255,0.6);
@@ -288,12 +288,12 @@
     -fx-background-color: rgba(255,255,255,0.2);
 }
 
-/* (Opcional) el prompt text también en blanco */
+/* prompt text también en blanco */
 .combo-box .text-field {
     -fx-prompt-text-fill: rgba(255,255,255,0.7);
 }
 
-/* Aplica igual a todos los labels dentro de perfiles/versiones si quieres */
+/* Aplica igual a todos los labels dentro de perfiles/versiones */
 .section-pane .label,
 .section-row .label {
     -fx-text-fill: white;
@@ -323,21 +323,21 @@
     -fx-border-width: 2;
 }
 
-/* Contenedor transparente por defecto */
+/* Contenedor transparente  */
 .screenshot-thumb-container {
     -fx-background-color: transparent;
     -fx-background-radius: 6 px;
 }
 
-/* Fondo violeta ligero al estar “selected” */
+/* Fondo violeta al estar “selected” */
 .screenshot-thumb-container.selected-thumb {
-    -fx-background-color: rgba(142, 45, 226, 0.4); /* #8e2de2 con transparencia */
+    -fx-background-color: rgba(142, 45, 226, 0.4);
     -fx-background-radius: 6px;
     -fx-effect: dropshadow(gaussian, rgba(142,45,226,0.6), 8, 0, 0, 0);
 
 }
 
-/* Sombra o borde opcional para resaltar más */
+/* Sombra o borde  para resaltar más */
 .screenshot-thumb-container.selected-thumb {
     -fx-effect: dropshadow(gaussian, rgba(142,45,226,0.6), 8, 0, 0, 0);
 }

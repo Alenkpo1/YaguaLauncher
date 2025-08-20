@@ -1,6 +1,6 @@
 package ui;
 
-import com.sun.jna.Native;
+
 import core.AuthManager;
 import core.AssetDownloader;
 import core.AssetsManager;
@@ -11,7 +11,7 @@ import core.ProfileManager;
 import core.ProfileManager.Profile;
 import core.VersionDetails;
 import core.VersionManager;
-import javafx.animation.Animation;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
@@ -41,41 +41,35 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.scene.Cursor;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
+
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.Priority;
-import javafx.application.Platform;
+
 import javafx.util.Duration;
 
 import java.awt.*;
 import java.io.*;
 import java.net.*;
 
-import java.net.InetAddress;
+
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import java.util.prefs.Preferences;
-import com.sun.jna.platform.win32.Shell32;
-import com.sun.jna.platform.win32.ShellAPI;
-import com.sun.jna.platform.win32.WinDef;
-import com.sun.jna.platform.win32.ShlObj;
-import com.sun.jna.ptr.IntByReference;
+
 
 import java.io.File;
 import java.nio.file.Path;
 
 
 public class MainWindow extends Application {
-    // — Directorio Minecraft (~/.minecraft o %APPDATA%/.minecraft)
+
     private final Path mcBaseDir = computeMcBaseDir();
 
-    private final String SERVER_HOST = "26.56.106.170";
+    private final String SERVER_HOST = "26.68.85.246";
     private final int SERVER_PORT = 25565;
     private final String SERVER_NAME = "Server AlenyToti";
     // — Managers
@@ -134,7 +128,7 @@ public class MainWindow extends Application {
     private Label statusLabel;
 
     private TextArea consoleTextArea;
-    // — Controles sección Lanzamiento
+    // Controles sección Lanzamiento
     private TextField ramField;
     private Button launchButton;
     private Label serverLabel;
@@ -149,7 +143,7 @@ public class MainWindow extends Application {
 
     @Override
     public void start(Stage stage) throws URISyntaxException {
-        // Carga opcional de fuente
+
         System.out.println("Path final del .exe: " + getExePath());
         try {
             Path iconoTemp = extraerRecursoComoArchivoTemporal("/ui/icon.ico", "icono");
@@ -163,8 +157,8 @@ public class MainWindow extends Application {
             e.printStackTrace();
         }
 
-        // en tu clase MainWindow o en tu inicializador de UI
-        String fontPath = "/ui/fonts/Rubik-Bold.ttf"; // ruta en src/main/resources/fonts
+
+        String fontPath = "/ui/fonts/Rubik-Bold.ttf";
         InputStream fontStream = getClass().getResourceAsStream(fontPath);
         if (fontStream == null) {
             System.err.println("¡No hallo la fuente en: " + fontPath + "!");
@@ -215,17 +209,11 @@ public class MainWindow extends Application {
             this.address = address;
         }
 
-        public String getName() {
-            return name;
-        }
 
-        public String getAddress() {
-            return address;
-        }
     }
 
     private ObservableList<Server> loadServers() {
-        // Aquí defines tus servidores fijos o los lees de un archivo
+
         return FXCollections.observableArrayList(
                 new Server("Servidor A", "mc.hypixel.net")
         );
@@ -235,21 +223,21 @@ public class MainWindow extends Application {
         consoleTextArea = new TextArea();
         consoleTextArea.setEditable(false);
         consoleTextArea.getStyleClass().add("console-text-area");
-        // permitir que crezca al máximo
+
         consoleTextArea.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         ScrollPane sp = new ScrollPane(consoleTextArea);
         sp.getStyleClass().add("console-scroll-pane");
         sp.setFitToWidth(true);
         sp.setFitToHeight(true);
-        // permitir que crezca al máximo
+
         sp.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         VBox.setVgrow(sp, Priority.ALWAYS);
 
         consolePane = new VBox(sp);
         consolePane.getStyleClass().add("console-pane");
         consolePane.setPadding(new Insets(10));
-        // si lo metes en un VBox y quieres también que lo expanda:
+
         consolePane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         VBox.setVgrow(consolePane, Priority.ALWAYS);
     }
@@ -290,13 +278,13 @@ public class MainWindow extends Application {
 
         loginButton = new Button("Login");
         loginButton.getStyleClass().add("login-button");
-        loginButton.setDefaultButton(true);                 // Enter dispara el botón
+        loginButton.setDefaultButton(true);
 
         loginStatusLabel = new Label();
         loginStatusLabel.getStyleClass().add("login-status");
         loginStatusLabel.setStyle("-fx-text-fill: tomato;");
 
-        // Acción de login (la usamos para el botón y para Enter en el textfield)
+        // Acción de login
         Runnable doLogin = () -> {
             String user = (usernameField.getText() == null) ? "" : usernameField.getText().trim();
             if (user.isEmpty()) {
@@ -304,7 +292,7 @@ public class MainWindow extends Application {
                 return;
             }
 
-            // Login offline (o tu flujo actual)
+            // Login offline
             session = authManager.loginOffline(user);
             try {
                 authManager.saveSession(session);
@@ -315,7 +303,7 @@ public class MainWindow extends Application {
             // Guardar último usuario
             prefs.put("lastUsername", user);
 
-            // Cambiar a la escena principal (construir si aún no existe)
+            // Cambiar a la escena principal
             Stage st = (Stage) loginButton.getScene().getWindow();
             if (mainScene == null) {
                 mainScene = buildMainScene(st);
@@ -331,7 +319,7 @@ public class MainWindow extends Application {
 
         // Click y Enter
         loginButton.setOnAction(e -> doLogin.run());
-        usernameField.setOnAction(e -> doLogin.run());      // Enter en el campo usuario
+        usernameField.setOnAction(e -> doLogin.run());
 
         // Layout del login
         VBox overlay = new VBox(15,
@@ -370,10 +358,10 @@ public class MainWindow extends Application {
     private double xOffset, yOffset;
 
     private Scene buildMainScene(Stage stage) {
-        // -> Quitar decoración nativa
+
         stage.initStyle(StageStyle.UNDECORATED);
 
-        // 1) Botones laterales
+
         navHome = makeNavButton("/ui/icons/home.png");
         navProfiles = makeNavButton("/ui/icons/user.png");
         navVersions = makeNavButton("/ui/icons/versions.png");
@@ -391,7 +379,7 @@ public class MainWindow extends Application {
         navBar.setPadding(new Insets(20));
         navBar.getStyleClass().add("nav-bar");
 
-        // 2) Contenido central
+
         buildHomePane();
         buildProfilesPane();
         buildVersionsPane();
@@ -408,7 +396,7 @@ public class MainWindow extends Application {
         navScreenshots.setOnAction(e -> showOnly(screenshotsPane));
 
 
-        // 3) Indicador de servidor arriba, dentro del layout principal
+
         serverLabel = new Label(SERVER_NAME);
         serverLabel.getStyleClass().add("server-name");
         serverLabel.setCursor(Cursor.DEFAULT);
@@ -427,7 +415,7 @@ public class MainWindow extends Application {
         serverBox.setAlignment(Pos.CENTER_RIGHT);
         serverBox.setPadding(new Insets(5, 15, 5, 15));
 
-        // 4) Layout principal con BorderPane
+
         BorderPane mainPane = new BorderPane();
         mainPane.getStyleClass().add("content-pane");
         mainPane.setLeft(navBar);
@@ -435,7 +423,7 @@ public class MainWindow extends Application {
         mainPane.setCenter(content);
         mainPane.setTop(serverBox);
 
-        // 5) Barra de título custom (flotando encima)
+
         Label titleLabel = new Label("YaguaLauncher");
         titleLabel.getStyleClass().add("window-title");
 
@@ -461,7 +449,7 @@ public class MainWindow extends Application {
         HBox titleBar = new HBox(15, titleLabel, dragSpacer, windowControls);
         titleBar.getStyleClass().add("window-title-bar");
         titleBar.setPadding(new Insets(5, 10, 5, 10));
-        // Arrastrar ventana por el titleBar
+
         titleBar.setOnMousePressed(ev -> {
             xOffset = ev.getSceneX();
             yOffset = ev.getSceneY();
@@ -473,16 +461,16 @@ public class MainWindow extends Application {
             }
         });
 
-        // 6) Contenedor raíz: VBox con titleBar arriba y mainPane abajo
+
         VBox root = new VBox(titleBar, mainPane);
         root.getStyleClass().add("root");
         VBox.setVgrow(mainPane, Priority.ALWAYS);
 
-        // 7) Escena y CSS
+
         Scene scene = new Scene(root, 1024, 600);
         scene.getStylesheets().add(getClass().getResource("/ui/styles.css").toExternalForm());
 
-        // 8) Ping periódico cada 5s
+
         Timeline pingTimer = new Timeline(
                 new KeyFrame(Duration.ZERO,
                         e -> pingServer()),
@@ -503,7 +491,7 @@ public class MainWindow extends Application {
         if (ramField != null)
             ramField.textProperty().addListener((obs,o,n) -> savePrefs(collectPrefsFromUI()));
 
-        // Por si el usuario cierra la ventana
+
         stage.setOnCloseRequest(e -> savePrefs(collectPrefsFromUI()));
 
         stage.setResizable(false);
@@ -548,7 +536,7 @@ public class MainWindow extends Application {
         String userHome = System.getProperty("user.home");
         Path escritorio = Paths.get(userHome, "Desktop", nombre + ".lnk");
 
-        if (Files.exists(escritorio)) return; // ya existe
+        if (Files.exists(escritorio)) return;
 
         try {
             String exePath = new File(MainWindow.class.getProtectionDomain()
@@ -698,7 +686,7 @@ public class MainWindow extends Application {
         row.getStyleClass().add("section-row");
         row.setAlignment(Pos.CENTER_LEFT);
 
-        // Botón abrir carpeta .minecraft
+
         openDirButton = new Button("Abrir carpeta de juego");
         openDirButton.getStyleClass().add("open-dir-button");
         openDirButton.setOnAction(e -> {
@@ -711,16 +699,16 @@ public class MainWindow extends Application {
             }
         });
 
-        // Botón comprobar actualizaciones
+
         updateButton = new Button("Comprobar actualizaciones");
         updateButton.getStyleClass().add("update-button");
         updateButton.setOnAction(e -> checkForUpdates());
 
-        // spacer vertical para llevar botones abajo
+
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        // fila inferior: botón izq y botón der
+
         Region bottomSpacer = new Region();
         HBox.setHgrow(bottomSpacer, Priority.ALWAYS);
 
@@ -917,12 +905,12 @@ public class MainWindow extends Application {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                // 0) Nos aseguramos de tener el manifest cargado para poder obtener la URL del JSON
+
                 if (versionManager.getVersions() == null || versionManager.getVersions().isEmpty()) {
                     versionManager.fetchManifest();
                 }
 
-                // 1) Prepara un directorio "limpio" para la versión
+                // Prepara un directorio "limpio" para la versión
                 Path versionDir = mcBaseDir.resolve("versions").resolve(ver);
                 if (Files.exists(versionDir)) {
                     try (java.util.stream.Stream<Path> walk = Files.walk(versionDir)) {
@@ -950,12 +938,12 @@ public class MainWindow extends Application {
                     Files.copy(in, jsonFile, StandardCopyOption.REPLACE_EXISTING);
                 }
 
-                // 3) Obtiene los detalles de la versión (para libs, jar y assets)
+                // obtiene los detalles de la versión (para libs, jar y assets)
                 VersionDetails det = new VersionManager(mcBaseDir).resolveVersionDetails(ver, mcBaseDir);
 
-                // 4) Descarga librerías (.jar normales)
+
                 int libs = det.getLibraries().size();
-                int coreTotal = libs + 1; // +1 por el client jar
+                int coreTotal = libs + 1;
                 int coreDone = 0;
 
                 for (var lib : det.getLibraries()) {
@@ -974,8 +962,8 @@ public class MainWindow extends Application {
                     updateProgress(++coreDone, coreTotal);
                 }
 
-                // 5) Descarga y extracción de Nativos LWJGL (Windows)
-                //    Directorio: <.minecraft>/versions/<ver>/natives  (coincide con LaunchExecutor)
+                // Descarga y extracción de Nativos LWJGL (Windows)
+
                 Path nativesDir = versionDir.resolve(ver + "-natives");
                 if (Files.exists(nativesDir)) {
                     try (java.util.stream.Stream<Path> walk = Files.walk(nativesDir)) {
@@ -998,10 +986,10 @@ public class MainWindow extends Application {
                         if (key == null) continue;
 
                         String k = key.toLowerCase(Locale.ROOT);
-                        // Cubre: natives-windows, natives-windows-*, etc. Solo extraemos en Windows
+
                         if (!isWindows || !k.contains("natives-windows")) continue;
 
-                        var nat = entry.getValue(); // Artifact
+                        var nat = entry.getValue();
                         if (nat == null) continue;
 
                         String url = nat.getUrl();
@@ -1015,7 +1003,7 @@ public class MainWindow extends Application {
                         updateMessage("Nativos: " + natJar.getFileName());
                         assetDownloader.downloadAndVerify(url, natJar, sha);
 
-                        // Extraemos solo archivos útiles (ignorar META-INF/)
+
                         try (java.util.zip.ZipInputStream zin =
                                      new java.util.zip.ZipInputStream(Files.newInputStream(natJar))) {
                             java.util.zip.ZipEntry ze;
@@ -1031,14 +1019,14 @@ public class MainWindow extends Application {
                     }
                 }
 
-                // 6) Descarga el JAR del cliente
+
                 var cd = det.getClientDownload();
                 Path clientJar = versionDir.resolve(ver + ".jar");
                 updateMessage("Cliente: " + ver + ".jar");
                 assetDownloader.downloadAndVerify(cd.getUrl(), clientJar, cd.getSha1());
                 updateProgress(++coreDone, coreTotal);
 
-                // 7) Descarga los assets
+
                 VersionDetails.AssetIndexInfo aiInfo = det.getAssetIndex();
                 AssetIndex ai = assetsManager.fetchAssetIndex(aiInfo.getUrl(), aiInfo.getId());
                 int totalA = ai.objects.size(), doneA = 0;
@@ -1050,14 +1038,14 @@ public class MainWindow extends Application {
                     updateProgress(coreDone + doneA, coreTotal + totalA);
                 }
 
-                // 8) Marca la versión como instalada
+
                 installedVersions.add(ver);
                 updateMessage("¡Descarga completa!");
                 return null;
             }
         };
 
-        // Bindings con la UI
+
         progressBar.progressProperty().bind(task.progressProperty());
         progressBar.setVisible(true);
         statusLabel.textProperty().bind(task.messageProperty());
@@ -1066,7 +1054,7 @@ public class MainWindow extends Application {
             statusLabel.textProperty().unbind();
             statusLabel.setText("¡Listo para lanzar!");
             launchButton.setDisable(false);
-            onVersionSelected(ver); // refresca botones
+            onVersionSelected(ver);
         });
         task.setOnFailed(evt -> {
             statusLabel.textProperty().unbind();
@@ -1097,7 +1085,7 @@ public class MainWindow extends Application {
         new Thread(() -> {
             Platform.runLater(() -> statusLabel.setText("Lanzando…"));
             try {
-                // Llama a la versión que vuelca logs a consola (si la usas)
+                // Llama a la versión que vuelca logs a consola
                 launchExecutor.launch(
                         session,
                         ver,
@@ -1111,7 +1099,7 @@ public class MainWindow extends Application {
                 ex.printStackTrace();
                 Platform.runLater(() -> statusLabel.setText("Error al lanzar"));
             } finally {
-                // Rehabilitamos los botones cuando el proceso termine (o falle)
+
                 Platform.runLater(() -> {
                     statusLabel.setText("¡Juego cerrado!");
                     enablePlayButtons();
@@ -1126,7 +1114,7 @@ public class MainWindow extends Application {
         File folder = ssDir.toFile();
         if (!folder.exists()) folder.mkdirs();
 
-        // Preview
+
         preview = new ImageView();
         preview.setPreserveRatio(true);
         preview.setFitWidth(600);
@@ -1135,7 +1123,7 @@ public class MainWindow extends Application {
 
         current = new SimpleObjectProperty<>();
 
-        // Doble-click abre en Windows
+
         preview.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && current.get() != null) {
                 try {
@@ -1146,13 +1134,13 @@ public class MainWindow extends Application {
             }
         });
 
-        // Columnita de thumbs
+
         thumbsColumn = new VBox(10);
         thumbsColumn.setPadding(new Insets(10));
         thumbsColumn.getStyleClass().add("screenshot-thumbs-column");
 
         thumbsColumn.setStyle(null);
-        // Carga inicial
+
         refreshScreenshotsOnce(folder.toPath());
 
         ScrollPane scrollThumbs = new ScrollPane(thumbsColumn);
@@ -1174,7 +1162,7 @@ public class MainWindow extends Application {
         screenshotsPane.setVisible(false);
         VBox.setVgrow(screenshotsPane, Priority.ALWAYS);
 
-        // Arranca el timer que refresca cada 5s
+
         startScreenshotsTimer(folder.toPath());
     }
 
@@ -1192,14 +1180,14 @@ public class MainWindow extends Application {
             none.getStyleClass().add("section-status");
             thumbsColumn.getChildren().add(none);
         } else {
-            // Previsualizamos la primera
+
             currentScreenshots.clear();
             for (File f : files) currentScreenshots.add(f.toPath());
             Path first = files[0].toPath();
             current.set(first);
             preview.setImage(new Image(first.toUri().toString(), 600, 0, true, true));
 
-            // Miniaturas
+
             for (Path p : currentScreenshots) {
                 addScreenshotThumbnail(p);
             }
@@ -1215,14 +1203,14 @@ public class MainWindow extends Application {
         });
         if (files != null) for (File f : files) found.add(f.toPath());
 
-        // 1) Nuevos
+
         for (Path p : found) {
             if (!currentScreenshots.contains(p)) {
                 currentScreenshots.add(p);
                 addScreenshotThumbnail(p);
             }
         }
-        // 2) Borrados
+
         Iterator<Path> it = currentScreenshots.iterator();
         while (it.hasNext()) {
             Path p = it.next();
@@ -1250,7 +1238,7 @@ public class MainWindow extends Application {
             dir.register(screenshotWatcher, StandardWatchEventKinds.ENTRY_CREATE,
                     StandardWatchEventKinds.ENTRY_DELETE);
 
-            // Lanzamos un hilo demonio que vigile la carpeta
+
             screenshotWatcherThread = new Thread(() -> {
                 try {
                     while (true) {
@@ -1260,7 +1248,7 @@ public class MainWindow extends Application {
                             Path filename = ((WatchEvent<Path>) ev).context();
                             Path fullPath = dir.resolve(filename);
 
-                            // Solo png/jpg
+
                             String ln = filename.toString().toLowerCase();
                             if (!(ln.endsWith(".png") || ln.endsWith(".jpg"))) continue;
 
@@ -1287,37 +1275,37 @@ public class MainWindow extends Application {
 
     private void addScreenshotThumbnail(Path imgPath) {
         try {
-            // 1) Cargar imagen en miniatura
+
             Image thumbImg = new Image(
                     imgPath.toUri().toString(),
-                    100,     // ancho
-                    0,       // auto-height
-                    true,    // preserve ratio
-                    true     // smooth
+                    100,
+                    0,
+                    true,
+                    true
             );
 
-            // 2) Crear ImageView
+
             ImageView thumb = new ImageView(thumbImg);
             thumb.setPreserveRatio(true);
             thumb.setFitWidth(100);
             thumb.getStyleClass().add("screenshot-thumb");
 
-            // 3) Envolver en un StackPane para poder pintar el fondo
+
             StackPane thumbContainer = new StackPane(thumb);
             thumbContainer.getStyleClass().add("screenshot-thumb-container");
             thumbContainer.setPadding(new Insets(4));
             thumbContainer.setCursor(Cursor.HAND);
 
-            // 4) Click handler: seleccionar y actualizar preview
+
             thumbContainer.setOnMouseClicked(e -> {
-                // a) desmarcar cualquier otro seleccionado
+
                 thumbsColumn.getChildren().forEach(node ->
                         node.getStyleClass().remove("selected-thumb")
                 );
-                // b) marcar este contenedor
+
                 thumbContainer.getStyleClass().add("selected-thumb");
 
-                // c) actualizar la ruta actual y la vista previa
+                // actualizar la ruta actual y la vista previa
                 current.set(imgPath);
                 preview.setImage(new Image(
                         imgPath.toUri().toString(),
@@ -1325,7 +1313,7 @@ public class MainWindow extends Application {
                 ));
             });
 
-            // 5) Añadir al VBox de miniaturas
+            // Añadir al VBox de miniaturas
             thumbsColumn.getChildren().add(thumbContainer);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -1333,7 +1321,7 @@ public class MainWindow extends Application {
     }
 
 
-    // Llamado al borrar un archivo
+
     private void removeScreenshotThumbnail(Path imgPath) {
         thumbsColumn.getChildren().removeIf(node -> {
             if (node instanceof ImageView iv) {
@@ -1341,7 +1329,7 @@ public class MainWindow extends Application {
             }
             return false;
         });
-        // Si la que estamos viendo en preview fue borrada, limpia la vista:
+
         if (current.get() != null && current.get().equals(imgPath)) {
             current.set(null);
             preview.setImage(null);
@@ -1366,18 +1354,18 @@ public class MainWindow extends Application {
 
 
     private String getCurrentVersion() {
-        // 1) Propiedad de sistema opcional (-Dyagua.version=1.0.5)
+
         String sys = System.getProperty("yagua.version");
         if (sys != null && !sys.isBlank()) return normalizeVersion(sys);
 
-        // 2) MANIFEST: Implementation-Version (si lo pone ShadowJar/jpackage)
+
         Package pkg = getClass().getPackage();
         if (pkg != null) {
             String impl = pkg.getImplementationVersion();
             if (impl != null && !impl.isBlank()) return normalizeVersion(impl);
         }
 
-        // 3) Recurso version.properties (si lo empaquetaste en resources)
+
         try (InputStream in = getClass().getResourceAsStream("/version.properties")) {
             if (in != null) {
                 Properties props = new Properties();
@@ -1387,16 +1375,16 @@ public class MainWindow extends Application {
             }
         } catch (IOException ignored) {}
 
-        // 4) Fallback
+
         return "0.0.0";
     }
 
     private String normalizeVersion(String raw) {
         if (raw == null) return "0.0.0";
         String s = raw.trim().toLowerCase();
-        // quita prefijo 'v'
+
         if (s.startsWith("v")) s = s.substring(1);
-        // toma solo dígitos y puntos del comienzo (descarta -rc1, +build, etc.)
+
         java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("^(\\d+(?:\\.\\d+)*)")
                 .matcher(s);
@@ -1441,10 +1429,10 @@ public class MainWindow extends Application {
         for (int i = 0; i < len; i++) {
             int ai = (i < a.length) ? parseOrZero(a[i]) : 0;
             int bi = (i < b.length) ? parseOrZero(b[i]) : 0;
-            if (bi > ai) return true;   // latest es mayor
-            if (bi < ai) return false;  // latest es menor
+            if (bi > ai) return true;
+            if (bi < ai) return false;
         }
-        return false; // iguales
+        return false;
     }
     private int parseOrZero(String s) {
         try { return Integer.parseInt(s.trim()); }
@@ -1473,12 +1461,12 @@ public class MainWindow extends Application {
         }
         String json = sb.toString();
 
-        // tag_name
+
         Matcher tagMatcher = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
         if (!tagMatcher.find()) throw new IOException("No se encontró tag_name");
         String tag = tagMatcher.group(1);
 
-        // browser_download_url de .exe
+
         Matcher urlMatcher = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+\\.exe)\"").matcher(json);
         if (!urlMatcher.find()) throw new IOException("No se encontró ningún asset .exe en la última release");
         String assetUrl = urlMatcher.group(1);
@@ -1543,7 +1531,7 @@ public class MainWindow extends Application {
                 };
                 downloadTask.setOnSucceeded(ev -> {
                     try {
-                        // new: instalador EXE, instala en silencio, deja flag y relanza
+
                         scheduleInteractiveInstallAndRestart(downloadTask.getValue(), latestTag);
                     } catch (Exception ex) {
                         ex.printStackTrace();
@@ -1570,7 +1558,7 @@ public class MainWindow extends Application {
 
     private Path downloadNewVersion(String assetUrl) throws IOException {
         URL url = new URL(assetUrl);
-        String fileName = new File(url.getPath()).getName(); // p.ej. YaguaLauncher-1.2.3-setup.exe
+        String fileName = new File(url.getPath()).getName();
         Path tmp = Files.createTempFile("YaguaLauncher-update-", "-" + fileName);
 
         try (InputStream in = url.openStream();
@@ -1582,7 +1570,7 @@ public class MainWindow extends Application {
 
 
     private void scheduleInteractiveInstallAndRestart(java.nio.file.Path installerExe, String latestTag) throws Exception {
-        String exePath = getExePath(); // tu EXE actual ya instalado
+        String exePath = getExePath();
         String exeName = new java.io.File(exePath).getName();
 
         String localAppData = System.getenv("LOCALAPPDATA");
@@ -1603,9 +1591,9 @@ public class MainWindow extends Application {
         String exeEsc    = exePath.replace("\"","\"\"");
         String runInstallerBlock =
                 needsElevation
-                        // Program Files -> forzar elevación con UAC y esperar
+
                         ? "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process -FilePath '" + installer.replace("\\","\\\\") + "' -Verb RunAs -Wait\""
-                        // per-user -> sin elevación, con UI normal y esperar
+
                         : "start /wait \"\" \"" + installer + "\"";
 
         String logFile = flagDir.resolve("update.log").toString();
@@ -1633,12 +1621,12 @@ public class MainWindow extends Application {
         );
         java.nio.file.Files.writeString(script, bat, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
 
-        // Abrimos el .bat en una consola (verás el installer con UI). Luego cerramos el launcher.
+
         new ProcessBuilder("cmd", "/C", "start", "\"YaguaUpdater\"", script.toString())
                 .inheritIO()
                 .start();
 
-        // Cerramos el launcher para que el instalador pueda reemplazar archivos
+
         javafx.application.Platform.exit();
     }
     /**
@@ -1672,7 +1660,7 @@ public class MainWindow extends Application {
                 "",
                 "if not exist %FLAGDIR% mkdir %FLAGDIR%",
                 "",
-                // Intento en silencio (Inno/NSIS suelen aceptar /S o /silent o /quiet)
+
                 "\"%INSTALLER%\" /S /silent /quiet",
                 "if %ERRORLEVEL% NEQ 0 (",
                 "  echo Instalador devolvio %ERRORLEVEL%, probando sin silencioso...",
@@ -1719,13 +1707,13 @@ public class MainWindow extends Application {
     }
 
     private String getExePath() {
-        // 1. App instalada: usar JPACKAGE_APP_PATH
+
         String jpackagePath = System.getenv("JPACKAGE_APP_PATH");
         if (jpackagePath != null && !jpackagePath.isEmpty()) {
             return jpackagePath;
         }
 
-        // 2. App en desarrollo (ejecutando desde IDE o gradle)
+
         try {
             File jarFile = new File(MainWindow.class
                     .getProtectionDomain()
@@ -1758,7 +1746,7 @@ public class MainWindow extends Application {
                         .findFirst();
 
                 if (flagOpt.isPresent()) {
-                    String fname = flagOpt.get().getFileName().toString(); // updated-v1.2.3.flag
+                    String fname = flagOpt.get().getFileName().toString();
                     String tag = fname.substring("updated-".length(), fname.length() - ".flag".length());
                     new Alert(Alert.AlertType.INFORMATION, "Actualizado a " + tag + " correctamente.").showAndWait();
                     Files.deleteIfExists(flagOpt.get());
@@ -1785,7 +1773,7 @@ public class MainWindow extends Application {
         public Integer ramMb;
     }
 
-    // Ruta: <.minecraft>/launcher_prefs.json
+    // Ruta
     private Path prefsPath() {
         return mcBaseDir.resolve("launcher_prefs.json");
     }
@@ -1797,7 +1785,7 @@ public class MainWindow extends Application {
                 return new com.fasterxml.jackson.databind.ObjectMapper().readValue(p.toFile(), LauncherPrefs.class);
             }
         } catch (Exception ignored) {}
-        return new LauncherPrefs(); // vacío por defecto
+        return new LauncherPrefs();
     }
 
     private void savePrefs(LauncherPrefs prefs) {
@@ -1825,7 +1813,7 @@ public class MainWindow extends Application {
         return prefs;
     }
 
-    // Aplica prefs a la UI si los ítems existen
+    // Aplica preferenciass a la UI si los ítems existen
     private void applyPrefsToUI(LauncherPrefs prefs) {
         if (prefs == null) return;
 
@@ -1835,7 +1823,7 @@ public class MainWindow extends Application {
         if (ramField != null && prefs.ramMb != null)
             ramField.setText(String.valueOf(prefs.ramMb));
 
-        // Como los combos pueden poblarse asíncronos, usa Platform.runLater
+        // poblacion de combos
         Platform.runLater(() -> {
             if (profileCombo != null && prefs.lastProfileId != null &&
                     profileCombo.getItems().contains(prefs.lastProfileId)) {

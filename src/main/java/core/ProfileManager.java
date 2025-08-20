@@ -18,7 +18,7 @@ public class ProfileManager {
         private String versionId;
         private int    ramMb;
 
-        // Jackson necesita constructor vacío:
+
         public Profile() {}
 
         public Profile(String name, String versionId, int ramMb) {
